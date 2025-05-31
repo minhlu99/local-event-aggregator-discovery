@@ -1,0 +1,364 @@
+{
+  "events": [
+    {
+      "id": "1",
+      "title": "Tech Startup Conference",
+      "description": "Annual conference for tech startups with keynotes, workshops, and networking opportunities.",
+      "date": "2024-12-10T09:00:00",
+      "endDate": "2024-12-11T18:00:00",
+      "location": {
+        "name": "Downtown Convention Center",
+        "address": "123 Main St, San Francisco, CA 94105",
+        "coordinates": {
+          "lat": 37.7749,
+          "lng": -122.4194
+        }
+      },
+      "image": "https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?w=800&auto=format&fit=crop",
+      "category": "Technology",
+      "tags": ["startup", "technology", "networking", "conference"],
+      "price": {
+        "value": 299,
+        "currency": "USD",
+        "type": "paid"
+      },
+      "organizer": {
+        "name": "SF Tech Association",
+        "website": "https://example.com/sftech"
+      },
+      "attendeeCount": 1500,
+      "featured": true
+    },
+    {
+      "id": "2",
+      "title": "Jazz in the Park",
+      "description": "A summer evening of jazz music in Central Park featuring local artists.",
+      "date": "2024-08-15T18:30:00",
+      "endDate": "2024-08-15T21:00:00",
+      "location": {
+        "name": "Central Park Main Stage",
+        "address": "Central Park, New York, NY 10022",
+        "coordinates": {
+          "lat": 40.7812,
+          "lng": -73.9665
+        }
+      },
+      "image": "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&auto=format&fit=crop",
+      "category": "Music",
+      "tags": ["jazz", "live music", "outdoor", "summer"],
+      "price": {
+        "value": 0,
+        "currency": "USD",
+        "type": "free"
+      },
+      "organizer": {
+        "name": "NYC Parks & Recreation",
+        "website": "https://example.com/nycparks"
+      },
+      "attendeeCount": 2000,
+      "featured": true
+    },
+    {
+      "id": "3",
+      "title": "Food Truck Festival",
+      "description": "Sample delicious dishes from over 30 food trucks featuring international cuisines.",
+      "date": "2024-09-05T11:00:00",
+      "endDate": "2024-09-05T20:00:00",
+      "location": {
+        "name": "Waterfront Plaza",
+        "address": "200 Harbor Dr, San Diego, CA 92101",
+        "coordinates": {
+          "lat": 32.7157,
+          "lng": -117.1611
+        }
+      },
+      "image": "https://images.unsplash.com/photo-1565123409695-7b5ef63a2efb?w=800&auto=format&fit=crop",
+      "category": "Food",
+      "tags": ["food trucks", "cuisine", "festival", "foodie"],
+      "price": {
+        "value": 10,
+        "currency": "USD",
+        "type": "paid"
+      },
+      "organizer": {
+        "name": "San Diego Food Truck Association",
+        "website": "https://example.com/sdfoodtrucks"
+      },
+      "attendeeCount": 5000,
+      "featured": true
+    },
+    {
+      "id": "4",
+      "title": "Weekend Farmers Market",
+      "description": "Local farmers selling fresh produce, artisanal food, and handcrafted goods.",
+      "date": "2024-07-20T08:00:00",
+      "endDate": "2024-07-20T14:00:00",
+      "location": {
+        "name": "Community Park",
+        "address": "500 Oak St, Portland, OR 97205",
+        "coordinates": {
+          "lat": 45.5231,
+          "lng": -122.6765
+        }
+      },
+      "image": "https://images.unsplash.com/photo-1488459716781-31db52582fe9?w=800&auto=format&fit=crop",
+      "category": "Food",
+      "tags": ["farmers market", "local produce", "organic", "artisanal"],
+      "price": {
+        "value": 0,
+        "currency": "USD",
+        "type": "free"
+      },
+      "organizer": {
+        "name": "Portland Farmers Association",
+        "website": "https://example.com/portlandfarmers"
+      },
+      "attendeeCount": 1200,
+      "featured": false
+    },
+    {
+      "id": "5",
+      "title": "Marathon for Charity",
+      "description": "Annual 26.2 mile marathon supporting local children's hospital. All proceeds go to charity.",
+      "date": "2024-10-12T07:00:00",
+      "endDate": "2024-10-12T15:00:00",
+      "location": {
+        "name": "City Center",
+        "address": "Downtown Chicago, IL 60601",
+        "coordinates": {
+          "lat": 41.8781,
+          "lng": -87.6298
+        }
+      },
+      "image": "https://images.unsplash.com/photo-1530137073265-82a3aba40ba6?w=800&auto=format&fit=crop",
+      "category": "Sports",
+      "tags": ["marathon", "running", "charity", "fitness"],
+      "price": {
+        "value": 50,
+        "currency": "USD",
+        "type": "paid"
+      },
+      "organizer": {
+        "name": "Chicago Runners Club",
+        "website": "https://example.com/chicagorunners"
+      },
+      "attendeeCount": 3500,
+      "featured": false
+    },
+    {
+      "id": "6",
+      "title": "Photography Workshop",
+      "description": "Learn portrait photography techniques from professional photographers in this hands-on workshop.",
+      "date": "2024-08-22T10:00:00",
+      "endDate": "2024-08-22T16:00:00",
+      "location": {
+        "name": "Modern Art Gallery",
+        "address": "123 Art Way, Austin, TX 78701",
+        "coordinates": {
+          "lat": 30.2672,
+          "lng": -97.7431
+        }
+      },
+      "image": "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&auto=format&fit=crop",
+      "category": "Arts",
+      "tags": ["photography", "workshop", "portrait", "learning"],
+      "price": {
+        "value": 150,
+        "currency": "USD",
+        "type": "paid"
+      },
+      "organizer": {
+        "name": "Austin Photography Club",
+        "website": "https://example.com/austinphoto"
+      },
+      "attendeeCount": 30,
+      "featured": false
+    },
+    {
+      "id": "7",
+      "title": "Craft Beer Festival",
+      "description": "Sample over 100 craft beers from 40 local and regional breweries.",
+      "date": "2024-09-18T12:00:00",
+      "endDate": "2024-09-18T20:00:00",
+      "location": {
+        "name": "Riverside Park",
+        "address": "400 River Rd, Denver, CO 80216",
+        "coordinates": {
+          "lat": 39.7392,
+          "lng": -104.9903
+        }
+      },
+      "image": "https://images.unsplash.com/photo-1575037614876-c38a4d44f5b8?w=800&auto=format&fit=crop",
+      "category": "Food",
+      "tags": ["beer", "craft beer", "festival", "tasting"],
+      "price": {
+        "value": 45,
+        "currency": "USD",
+        "type": "paid"
+      },
+      "organizer": {
+        "name": "Colorado Brewers Guild",
+        "website": "https://example.com/cobrewers"
+      },
+      "attendeeCount": 2500,
+      "featured": true
+    },
+    {
+      "id": "8",
+      "title": "Entrepreneurship Summit",
+      "description": "Connect with successful entrepreneurs, investors, and business leaders at this annual summit.",
+      "date": "2024-11-05T08:00:00",
+      "endDate": "2024-11-06T17:00:00",
+      "location": {
+        "name": "Business Convention Center",
+        "address": "789 Corporate Blvd, Seattle, WA 98101",
+        "coordinates": {
+          "lat": 47.6062,
+          "lng": -122.3321
+        }
+      },
+      "image": "https://images.unsplash.com/photo-1529651598989-68a72c4476b7?w=800&auto=format&fit=crop",
+      "category": "Business",
+      "tags": ["entrepreneurship", "business", "networking", "investors"],
+      "price": {
+        "value": 399,
+        "currency": "USD",
+        "type": "paid"
+      },
+      "organizer": {
+        "name": "Seattle Business Alliance",
+        "website": "https://example.com/seattlebusiness"
+      },
+      "attendeeCount": 1000,
+      "featured": false
+    },
+    {
+      "id": "9",
+      "title": "Community Cleanup Day",
+      "description": "Join your neighbors in cleaning up local parks and streets. Supplies provided.",
+      "date": "2024-08-12T09:00:00",
+      "endDate": "2024-08-12T13:00:00",
+      "location": {
+        "name": "Neighborhood Park",
+        "address": "456 Community St, Boston, MA 02108",
+        "coordinates": {
+          "lat": 42.3601,
+          "lng": -71.0589
+        }
+      },
+      "image": "https://images.unsplash.com/photo-1579016188543-1ed397e3c792?w=800&auto=format&fit=crop",
+      "category": "Community",
+      "tags": ["volunteer", "cleanup", "environment", "community service"],
+      "price": {
+        "value": 0,
+        "currency": "USD",
+        "type": "free"
+      },
+      "organizer": {
+        "name": "Boston Neighborhood Association",
+        "website": "https://example.com/bostonneighborhood"
+      },
+      "attendeeCount": 150,
+      "featured": false
+    },
+    {
+      "id": "10",
+      "title": "Yoga in the Park",
+      "description": "Free morning yoga sessions for all levels, led by certified instructors.",
+      "date": "2024-07-25T07:30:00",
+      "endDate": "2024-07-25T08:30:00",
+      "location": {
+        "name": "Sunrise Park",
+        "address": "300 East St, Miami, FL 33131",
+        "coordinates": {
+          "lat": 25.7617,
+          "lng": -80.1918
+        }
+      },
+      "image": "https://images.unsplash.com/photo-1593811167562-9cef47bfc4d7?w=800&auto=format&fit=crop",
+      "category": "Fitness",
+      "tags": ["yoga", "wellness", "outdoor", "fitness"],
+      "price": {
+        "value": 0,
+        "currency": "USD",
+        "type": "free"
+      },
+      "organizer": {
+        "name": "Miami Wellness Collective",
+        "website": "https://example.com/miamiwellness"
+      },
+      "attendeeCount": 75,
+      "featured": false
+    },
+    {
+      "id": "11",
+      "title": "Classic Film Festival",
+      "description": "Three-day festival featuring classic films from the golden age of cinema.",
+      "date": "2024-10-20T16:00:00",
+      "endDate": "2024-10-22T23:00:00",
+      "location": {
+        "name": "Historic Theater",
+        "address": "567 Cinema Ave, Los Angeles, CA 90028",
+        "coordinates": {
+          "lat": 34.0522,
+          "lng": -118.2437
+        }
+      },
+      "image": "https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?w=800&auto=format&fit=crop",
+      "category": "Film",
+      "tags": ["film", "cinema", "classic", "festival"],
+      "price": {
+        "value": 75,
+        "currency": "USD",
+        "type": "paid"
+      },
+      "organizer": {
+        "name": "LA Film Society",
+        "website": "https://example.com/lafilm"
+      },
+      "attendeeCount": 800,
+      "featured": true
+    },
+    {
+      "id": "12",
+      "title": "Home and Garden Show",
+      "description": "Explore the latest in home design, landscaping, and gardening trends.",
+      "date": "2024-09-25T10:00:00",
+      "endDate": "2024-09-27T18:00:00",
+      "location": {
+        "name": "County Exhibition Center",
+        "address": "890 Expo Dr, Philadelphia, PA 19104",
+        "coordinates": {
+          "lat": 39.9526,
+          "lng": -75.1652
+        }
+      },
+      "image": "https://images.unsplash.com/photo-1528495612343-9ca9f4a9f67c?w=800&auto=format&fit=crop",
+      "category": "Home & Garden",
+      "tags": ["home", "garden", "design", "landscaping", "decoration"],
+      "price": {
+        "value": 15,
+        "currency": "USD",
+        "type": "paid"
+      },
+      "organizer": {
+        "name": "Philly Home Expo",
+        "website": "https://example.com/phillyhome"
+      },
+      "attendeeCount": 5000,
+      "featured": false
+    }
+  ],
+  "categories": [
+    { "id": "technology", "name": "Technology", "icon": "computer" },
+    { "id": "music", "name": "Music", "icon": "music_note" },
+    { "id": "food", "name": "Food", "icon": "restaurant" },
+    { "id": "sports", "name": "Sports", "icon": "sports_basketball" },
+    { "id": "arts", "name": "Arts", "icon": "palette" },
+    { "id": "business", "name": "Business", "icon": "business_center" },
+    { "id": "community", "name": "Community", "icon": "people" },
+    { "id": "fitness", "name": "Fitness", "icon": "fitness_center" },
+    { "id": "film", "name": "Film", "icon": "movie" },
+    { "id": "home-garden", "name": "Home & Garden", "icon": "home" }
+  ]
+} 

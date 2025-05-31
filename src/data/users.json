@@ -1,0 +1,74 @@
+{
+  "users": [
+    {
+      "id": "user1",
+      "username": "johndoe",
+      "email": "john.doe@example.com",
+      "name": "John Doe",
+      "avatar": "https://randomuser.me/api/portraits/men/1.jpg",
+      "preferences": {
+        "categories": ["Technology", "Business"],
+        "locations": ["San Francisco, CA"],
+        "maxPrice": 200
+      },
+      "savedEvents": ["1", "8"],
+      "attendedEvents": ["3", "7"]
+    },
+    {
+      "id": "user2",
+      "username": "janedoe",
+      "email": "jane.doe@example.com",
+      "name": "Jane Doe",
+      "avatar": "https://randomuser.me/api/portraits/women/1.jpg",
+      "preferences": {
+        "categories": ["Music", "Arts", "Film"],
+        "locations": ["New York, NY"],
+        "maxPrice": 100
+      },
+      "savedEvents": ["2", "6", "11"],
+      "attendedEvents": ["2", "4"]
+    },
+    {
+      "id": "user3",
+      "username": "bobsmith",
+      "email": "bob.smith@example.com",
+      "name": "Bob Smith",
+      "avatar": "https://randomuser.me/api/portraits/men/2.jpg",
+      "preferences": {
+        "categories": ["Food", "Sports"],
+        "locations": ["Chicago, IL"],
+        "maxPrice": 50
+      },
+      "savedEvents": ["3", "5", "7"],
+      "attendedEvents": ["5", "10"]
+    },
+    {
+      "id": "user4",
+      "username": "alicejohnson",
+      "email": "alice.johnson@example.com",
+      "name": "Alice Johnson",
+      "avatar": "https://randomuser.me/api/portraits/women/2.jpg",
+      "preferences": {
+        "categories": ["Community", "Fitness", "Food"],
+        "locations": ["Austin, TX"],
+        "maxPrice": 75
+      },
+      "savedEvents": ["4", "9", "10"],
+      "attendedEvents": ["6", "9"]
+    },
+    {
+      "id": "user5",
+      "username": "michaelwilson",
+      "email": "michael.wilson@example.com",
+      "name": "Michael Wilson",
+      "avatar": "https://randomuser.me/api/portraits/men/3.jpg",
+      "preferences": {
+        "categories": ["Technology", "Film", "Home & Garden"],
+        "locations": ["Seattle, WA"],
+        "maxPrice": 150
+      },
+      "savedEvents": ["1", "11", "12"],
+      "attendedEvents": ["1", "8", "12"]
+    }
+  ]
+} 
