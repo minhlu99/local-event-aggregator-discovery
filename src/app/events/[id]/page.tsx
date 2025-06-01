@@ -17,6 +17,7 @@ import {
   FaTicketAlt,
   FaUsers,
 } from "react-icons/fa";
+import AddToCalendarButton from "./AddToCalendarButton";
 import RecommendedEvents from "./RecommendedEvents";
 import SaveEventButton from "./SaveEventButton";
 
@@ -253,9 +254,43 @@ export default async function EventPage({ params }: PageProps) {
 
           {/* Content */}
           <div className="container mx-auto px-4 py-8">
-            <div className="flex flex-col md:flex-row gap-8">
+            <div className="flex flex-col lg:flex-row gap-8">
               {/* Main Content */}
-              <div className="md:w-2/3">
+              <div className="lg:w-2/3">
+                {/* Action buttons */}
+                <div className="flex flex-wrap gap-3 mb-8">
+                  <SaveEventButton eventId={event.id} />
+
+                  {/* If event has tickets */}
+                  {event.url && (
+                    <a
+                      href={event.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                    >
+                      <FaTicketAlt />
+                      <span>Get Tickets</span>
+                    </a>
+                  )}
+
+                  {/* Add to Calendar button */}
+                  <AddToCalendarButton event={event} />
+
+                  {/* If event has a website */}
+                  {tmEvent._embedded?.attractions?.[0]?.url && (
+                    <a
+                      href={tmEvent._embedded.attractions[0].url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 bg-white hover:bg-gray-50 text-gray-800 font-medium py-2 px-4 rounded-lg border border-gray-300 transition-colors"
+                    >
+                      <FaGlobe />
+                      <span>Official Website</span>
+                    </a>
+                  )}
+                </div>
+
                 <div className="bg-white rounded-lg shadow-md p-6 mb-6">
                   <h2 className="text-2xl font-bold mb-4 text-gray-900">
                     About This Event
@@ -394,26 +429,6 @@ export default async function EventPage({ params }: PageProps) {
                         )}
                     </div>
                   </div>
-
-                  {/* Official Website Link */}
-                  {event.url && (
-                    <div className="flex items-start">
-                      <FaGlobe className="text-primary-500 mt-1 mr-3" />
-                      <div>
-                        <p className="font-medium text-gray-900">
-                          Official Event
-                        </p>
-                        <Link
-                          href={event.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-primary-600 hover:underline inline-flex items-center mt-1"
-                        >
-                          Visit event website
-                        </Link>
-                      </div>
-                    </div>
-                  )}
                 </div>
 
                 {/* Similar Events */}
@@ -434,7 +449,7 @@ export default async function EventPage({ params }: PageProps) {
               </div>
 
               {/* Sidebar */}
-              <div className="md:w-1/3">
+              <div className="lg:w-1/3">
                 <div className="bg-white rounded-lg shadow-md p-6 sticky top-20">
                   <div className="flex justify-between items-center mb-4">
                     <div>

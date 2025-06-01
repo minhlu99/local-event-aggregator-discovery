@@ -3,7 +3,8 @@
 import { motion } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
-import { FaGithub, FaInstagram, FaTwitter } from "react-icons/fa";
+import { FaGithub, FaInstagram } from "react-icons/fa";
+import { FaXTwitter } from "react-icons/fa6";
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
@@ -103,16 +104,16 @@ const Footer = () => {
             </h3>
             <div className="flex space-x-4 justify-center md:justify-end">
               <a
-                href="#"
+                href="https://x.com/SuiNetwork"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-gray-400 hover:text-primary-400"
               >
-                <FaTwitter size={18} />
+                <FaXTwitter size={18} />
                 <span className="sr-only">Twitter</span>
               </a>
               <a
-                href="#"
+                href="https://www.instagram.com/sui.network.official/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-gray-400 hover:text-primary-400"
@@ -121,7 +122,7 @@ const Footer = () => {
                 <span className="sr-only">Instagram</span>
               </a>
               <a
-                href="#"
+                href="https://github.com/MystenLabs/sui"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-gray-400 hover:text-primary-400"

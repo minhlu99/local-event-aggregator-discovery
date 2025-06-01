@@ -1,7 +1,7 @@
 "use client";
 
 import { Category } from "@/types";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Fragment, useEffect, useRef, useState } from "react";
 import {
   FaCalendarAlt,
@@ -11,6 +11,7 @@ import {
   FaTags,
   FaTimes,
 } from "react-icons/fa";
+import { useEvents } from "./EventsContext";
 
 // Define interface for category data from API
 interface CategoryResponse {
@@ -38,8 +39,8 @@ interface GeocodingResult {
 }
 
 const EventsFilter = () => {
-  const router = useRouter();
   const searchParams = useSearchParams();
+  const { setFilterParam, clearFilters } = useEvents();
   const [categories, setCategories] = useState<Category[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -273,25 +274,11 @@ const EventsFilter = () => {
     setLocationInput(locationName);
     setShowSuggestions(false);
 
-    // Build the query parameters with exact lat/lon
-    const params = new URLSearchParams(searchParams?.toString() || "");
-
-    // Set the location name
-    params.set("location", locationName);
-
-    // Set the exact latitude and longitude for the API
-    params.set("latlong", `${result.lat},${result.lon}`);
-
-    // Always set sort to relevance,desc as default
-    params.set("sort", "relevance,desc");
-
-    // Optional: Add radius parameter (in miles)
-    params.set("radius", "25");
-    params.set("unit", "miles");
-
-    // Apply the filters
-    console.log("Navigating with location params:", params.toString());
-    router.push(`/events?${params.toString()}`);
+    // Set location parameters
+    setFilterParam("location", locationName);
+    setFilterParam("latlong", `${result.lat},${result.lon}`);
+    setFilterParam("radius", "25");
+    setFilterParam("unit", "miles");
 
     // Auto-close filters on mobile after selection
     if (window.innerWidth < 768) {
@@ -300,55 +287,8 @@ const EventsFilter = () => {
   };
 
   const handleFilterChange = (name: string, value: string) => {
-    if (!searchParams) return;
-
-    // Create a new URLSearchParams instance from the current URL
-    const params = new URLSearchParams(searchParams.toString());
-
-    // Always set sort to relevance,desc as default
-    params.set("sort", "relevance,desc");
-
-    // Clear any existing date/time parameters to avoid conflicts
-    if (name === "date") {
-      params.delete("startDateTime");
-      params.delete("endDateTime");
-      params.delete("includePast");
-
-      // Set or remove the date parameter
-      if (value) {
-        params.set(name, value);
-      } else {
-        params.delete(name);
-      }
-
-      // No need to set additional date parameters - the backend will handle it
-    }
-    // For category filtering, we need to set classificationId directly
-    else if (name === "category") {
-      // Clear any existing classification parameters to avoid conflicts
-      params.delete("classificationName");
-      params.delete("classificationId");
-      params.delete("segmentId");
-      params.delete("category"); // Ensure legacy parameter is removed
-
-      if (value) {
-        // Use the category ID directly as the classificationId for the Ticketmaster API
-        params.set("classificationId", value);
-      }
-    }
-    // Normal handling for other parameters
-    else {
-      if (value) {
-        params.set(name, value);
-      } else {
-        params.delete(name);
-      }
-    }
-
-    // Debug the parameters being sent
-    console.log("Navigating with params:", params.toString());
-
-    router.push(`/events?${params.toString()}`);
+    // Use context to update filter parameters
+    setFilterParam(name, value);
 
     // Auto-close filters on mobile after selection
     if (window.innerWidth < 768) {
@@ -356,9 +296,9 @@ const EventsFilter = () => {
     }
   };
 
-  const clearFilters = () => {
+  const handleClearFilters = () => {
     setLocationInput("");
-    router.push("/events");
+    clearFilters();
   };
 
   const hasActiveFilters = currentCategory || currentDate || currentLocation;
@@ -392,7 +332,7 @@ const EventsFilter = () => {
           {hasActiveFilters && (
             <button
               className="text-sm text-primary-600 hover:text-primary-800"
-              onClick={clearFilters}
+              onClick={handleClearFilters}
             >
               Clear all
             </button>
@@ -423,7 +363,7 @@ const EventsFilter = () => {
         className={`${
           isOpen
             ? "fixed left-0 right-0 bottom-0 top-[76px] bg-white z-20 overflow-y-auto p-6"
-            : "hidden md:block overflow-y-auto max-h-[calc(100vh-120px)]"
+            : "hidden md:block overflow-y-auto max-h-[calc(100vh-60px)]"
         } space-y-6`}
       >
         {isOpen && (
@@ -505,36 +445,33 @@ const EventsFilter = () => {
             <h3 className="font-semibold text-lg text-gray-800">Date</h3>
           </div>
           <div className="space-y-2">
-            {["all", "today", "this-week", "this-month", "upcoming"].map(
-              (date) => (
-                <div key={date} className="flex items-center">
-                  <input
-                    type="radio"
-                    id={`date-${date}`}
-                    name="date"
-                    value={date === "all" ? "" : date}
-                    checked={
-                      (date === "all" && currentDate === "") ||
-                      currentDate === date
-                    }
-                    onChange={() =>
-                      handleFilterChange("date", date === "all" ? "" : date)
-                    }
-                    className="mr-2 accent-primary-600 h-4 w-4"
-                  />
-                  <label
-                    htmlFor={`date-${date}`}
-                    className="text-gray-700 text-base"
-                  >
-                    {date === "all" && "Any time"}
-                    {date === "today" && "Today"}
-                    {date === "this-week" && "This week"}
-                    {date === "this-month" && "This month"}
-                    {date === "upcoming" && "Upcoming"}
-                  </label>
-                </div>
-              )
-            )}
+            {["all", "today", "this-week", "this-month"].map((date) => (
+              <div key={date} className="flex items-center">
+                <input
+                  type="radio"
+                  id={`date-${date}`}
+                  name="date"
+                  value={date === "all" ? "" : date}
+                  checked={
+                    (date === "all" && currentDate === "") ||
+                    currentDate === date
+                  }
+                  onChange={() =>
+                    handleFilterChange("date", date === "all" ? "" : date)
+                  }
+                  className="mr-2 accent-primary-600 h-4 w-4"
+                />
+                <label
+                  htmlFor={`date-${date}`}
+                  className="text-gray-700 text-base"
+                >
+                  {date === "all" && "Upcoming"}
+                  {date === "today" && "Today"}
+                  {date === "this-week" && "This week"}
+                  {date === "this-month" && "This month"}
+                </label>
+              </div>
+            ))}
           </div>
         </Fragment>
 
@@ -622,7 +559,7 @@ const EventsFilter = () => {
         {hasActiveFilters && (
           <div className="pt-4 border-t">
             <button
-              onClick={clearFilters}
+              onClick={handleClearFilters}
               className="w-full py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors text-base"
             >
               Clear all filters
