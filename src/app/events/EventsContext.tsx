@@ -53,6 +53,35 @@ export function EventsProvider({ children }: { children: ReactNode }) {
           name = ""; // Don't set the name parameter later
         }
       }
+      // For location filtering
+      else if (name === "location") {
+        if (!value) {
+          // If clearing location, also clear related location parameters
+          params.delete("location");
+          params.delete("latlong");
+          params.delete("radius");
+          params.delete("unit");
+          name = ""; // Don't set the name parameter later
+        }
+      }
+      // If setting latlong directly, ensure other location params exist
+      else if (name === "latlong") {
+        if (!value) {
+          // If clearing coordinates, also clear related location parameters
+          params.delete("location");
+          params.delete("latlong");
+          params.delete("radius");
+          params.delete("unit");
+          name = ""; // Don't set the name parameter later
+        } else if (!params.has("radius")) {
+          // Ensure we have a default radius if not already set
+          params.set("radius", "25");
+        }
+        if (!params.has("unit")) {
+          // Ensure we have a default unit if not already set
+          params.set("unit", "miles");
+        }
+      }
 
       // For most parameters, set or delete based on value
       if (name) {
