@@ -451,7 +451,7 @@ export default async function EventPage({ params }: PageProps) {
               {/* Sidebar */}
               <div className="lg:w-1/3">
                 <div className="bg-white rounded-lg shadow-md p-6 sticky top-20">
-                  <div className="flex justify-between items-center mb-4">
+                  <div className="flex justify-between items-center mb-4 text-gray-900">
                     <div>
                       {event.priceRanges && event.priceRanges.length > 0 ? (
                         <h3 className="text-2xl font-bold">
