@@ -498,12 +498,25 @@ export default function OnboardingPage() {
         longitude: loc.longitude,
       }));
 
+      // Check if there's no location marked as current, set the first one as current
+      const currentLocationExists = preferredLocations.some(
+        (loc) => loc.isCurrent
+      );
+      let locationsToUse = preferredLocations;
+
+      if (!currentLocationExists && preferredLocations.length > 0) {
+        locationsToUse = [
+          { ...preferredLocations[0], isCurrent: true },
+          ...preferredLocations.slice(1),
+        ];
+      }
+
       // In a real app, you would send this data to your backend
       // For now, we'll just store it in localStorage
       const preferences: UserPreferences = {
         categories: selectedCategories,
         // Store full location objects now instead of just city names
-        locations: preferredLocations.map((loc) => loc.city),
+        locations: locationsToUse.map((loc) => loc.city),
         maxPrice: 1000,
       };
 
@@ -515,7 +528,7 @@ export default function OnboardingPage() {
       localStorage.setItem("userPreferences", JSON.stringify(preferences));
 
       // Save current location separately for quick access
-      const currentLocation = preferredLocations.find((loc) => loc.isCurrent);
+      const currentLocation = locationsToUse.find((loc) => loc.isCurrent);
       if (currentLocation) {
         localStorage.setItem("currentLocation", currentLocation.city);
 
