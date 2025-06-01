@@ -4,15 +4,33 @@ import CategorySelection from "@/components/ui/CategorySelection";
 import { UserPreferences } from "@/types";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   FaCalendar,
+  FaCheck,
   FaLocationArrow,
   FaMapMarkerAlt,
   FaSearch,
   FaSpinner,
   FaTimesCircle,
 } from "react-icons/fa";
+
+// Custom debounce hook
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+}
 
 interface UserData {
   name: string;
@@ -26,6 +44,29 @@ interface Location {
   isCurrent: boolean;
   latitude?: number;
   longitude?: number;
+}
+
+interface LocationSearchResult {
+  displayName: string;
+  city: string;
+  latitude: number;
+  longitude: number;
+}
+
+// Define Nominatim API response type
+interface NominatimPlace {
+  place_id: number;
+  lat: string;
+  lon: string;
+  display_name: string;
+  address: {
+    city?: string;
+    town?: string;
+    village?: string;
+    county?: string;
+    state?: string;
+    [key: string]: string | undefined;
+  };
 }
 
 export default function OnboardingPage() {
@@ -43,6 +84,129 @@ export default function OnboardingPage() {
   >("idle");
   const [locationError, setLocationError] = useState("");
   const [showLocationError, setShowLocationError] = useState(false);
+  const [locationSearchResults, setLocationSearchResults] = useState<
+    LocationSearchResult[]
+  >([]);
+  const [locationDetectionStartTime, setLocationDetectionStartTime] =
+    useState<number>(0);
+  const MIN_DETECTION_TIME = 5000; // Minimum 5 seconds of showing loading state
+
+  // Apply debounce to the location input
+  const debouncedLocationInput = useDebounce(locationInput, 500);
+
+  // Keep track of the latest search request
+  const latestSearchRef = useRef<string>("");
+
+  // Add a ref to keep track of the location timeout
+  const locationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleCategorySelection = (categories: string[]) => {
+    setSelectedCategories(categories);
+    setStep(2);
+  };
+
+  const searchLocations = useCallback(async () => {
+    const searchTerm = locationInput.trim();
+    if (!searchTerm) return;
+
+    // Store this search term as the latest search
+    const currentSearch = searchTerm;
+    latestSearchRef.current = currentSearch;
+
+    setValidatingCity(true);
+    setLocationError("");
+    setShowLocationError(false);
+    setLocationSearchResults([]);
+
+    try {
+      // Use the Nominatim API for geocoding - it's free and doesn't require API key
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+          searchTerm
+        )}&limit=5&addressdetails=1`
+      );
+
+      // Check if this is still the latest search request
+      if (latestSearchRef.current !== currentSearch) {
+        // A newer search has been initiated, discard these results
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error("Failed to search locations");
+      }
+
+      const data = (await response.json()) as NominatimPlace[];
+
+      // Check again if this is still the latest search after awaiting the response
+      if (latestSearchRef.current !== currentSearch) {
+        // A newer search has been initiated, discard these results
+        return;
+      }
+
+      if (data && data.length > 0) {
+        // Process search results
+        const results: LocationSearchResult[] = data.map((place) => {
+          const address = place.address;
+          // Try to get the most accurate city name
+          const cityName =
+            address.city ||
+            address.town ||
+            address.village ||
+            address.county ||
+            address.state ||
+            place.display_name.split(",")[0];
+
+          return {
+            displayName: place.display_name,
+            city: cityName,
+            latitude: parseFloat(place.lat),
+            longitude: parseFloat(place.lon),
+          };
+        });
+
+        setLocationSearchResults(results);
+      } else {
+        // Check again if this is still the latest search
+        if (latestSearchRef.current !== currentSearch) {
+          return;
+        }
+        setLocationError(
+          "No locations found. Please try a different search term."
+        );
+        setShowLocationError(true);
+      }
+    } catch {
+      // Check if this is still the latest search
+      if (latestSearchRef.current !== currentSearch) {
+        return;
+      }
+      setLocationError("Failed to search locations. Please try again.");
+      setShowLocationError(true);
+    } finally {
+      // Only update loading state if this is still the latest search
+      if (latestSearchRef.current === currentSearch) {
+        setValidatingCity(false);
+      }
+    }
+  }, [locationInput]);
+
+  // Auto-search when debounced input changes
+  useEffect(() => {
+    if (debouncedLocationInput.trim().length >= 2) {
+      searchLocations();
+    } else {
+      setLocationSearchResults([]);
+    }
+  }, [debouncedLocationInput, searchLocations]);
+
+  const handleLocationSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    // Prevent duplicate searches since we're using debounce
+    if (debouncedLocationInput !== locationInput) {
+      searchLocations();
+    }
+  };
 
   useEffect(() => {
     // Check if user is logged in
@@ -71,95 +235,30 @@ export default function OnboardingPage() {
     }
   }, [router]);
 
-  const handleCategorySelection = (categories: string[]) => {
-    setSelectedCategories(categories);
-    setStep(2);
-  };
+  const addLocationFromResult = (result: LocationSearchResult) => {
+    // Check if this location already exists
+    const locationExists = preferredLocations.some(
+      (loc) => loc.city.toLowerCase() === result.city.toLowerCase()
+    );
 
-  const handleLocationSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    validateAndAddLocation();
-  };
-
-  const validateAndAddLocation = async () => {
-    if (!locationInput.trim()) return;
-
-    setValidatingCity(true);
-    setLocationError("");
-    setShowLocationError(false);
-
-    try {
-      // Use the Nominatim API for geocoding - it's free and doesn't require API key
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-          locationInput.trim()
-        )}&limit=1&addressdetails=1`
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to validate city");
-      }
-
-      const data = await response.json();
-
-      if (data && data.length > 0) {
-        // Get city from the response
-        const place = data[0];
-        const address = place.address;
-
-        // Try to get the most accurate city name
-        const cityName =
-          address.city ||
-          address.town ||
-          address.village ||
-          address.county ||
-          address.state ||
-          place.display_name.split(",")[0];
-
-        // Get coordinates
-        const lat = parseFloat(place.lat);
-        const lon = parseFloat(place.lon);
-
-        if (cityName) {
-          // Check if this location already exists
-          const locationExists = preferredLocations.some(
-            (loc) => loc.city.toLowerCase() === cityName.toLowerCase()
-          );
-
-          if (locationExists) {
-            setLocationError("This location is already in your list");
-            setShowLocationError(true);
-          } else {
-            // Add valid location with coordinates
-            setPreferredLocations([
-              ...preferredLocations,
-              {
-                city: cityName,
-                isCurrent: false,
-                latitude: lat,
-                longitude: lon,
-              },
-            ]);
-            setLocationInput("");
-            setLocationError("");
-            setShowLocationError(false);
-          }
-        } else {
-          setLocationError(
-            "Couldn't identify a valid city. Please try again with a different search term."
-          );
-          setShowLocationError(true);
-        }
-      } else {
-        setLocationError("City not found. Please enter a valid city name.");
-        setShowLocationError(true);
-      }
-    } catch (error) {
-      console.error("Error validating city:", error);
-      setLocationError("Failed to validate city. Please try again.");
+    if (locationExists) {
+      setLocationError("This location is already in your list");
       setShowLocationError(true);
-    } finally {
-      setValidatingCity(false);
+    } else {
+      // Add valid location with coordinates
+      setPreferredLocations([
+        ...preferredLocations,
+        {
+          city: result.city,
+          isCurrent: false,
+          latitude: result.latitude,
+          longitude: result.longitude,
+        },
+      ]);
+      setLocationInput("");
+      setLocationError("");
+      setShowLocationError(false);
+      setLocationSearchResults([]);
     }
   };
 
@@ -173,141 +272,204 @@ export default function OnboardingPage() {
     setLocationDetectionState("detecting");
     setLocationError("");
     setShowLocationError(false);
+    setLocationDetectionStartTime(Date.now());
+
+    // Clear any existing timeout
+    if (locationTimeoutRef.current) {
+      clearTimeout(locationTimeoutRef.current);
+      locationTimeoutRef.current = null;
+    }
 
     // Check if running in a browser environment
     if (typeof window === "undefined" || !navigator.geolocation) {
-      setLocationError(
-        "Geolocation is not supported by your browser. Please enter your location manually."
-      );
-      setLocationDetectionState("error");
-      setShowLocationError(true);
-      setDetectingLocation(false);
+      // Calculate how long to wait before showing error
+      const timeElapsed = Date.now() - locationDetectionStartTime;
+      const waitTime = Math.max(0, MIN_DETECTION_TIME - timeElapsed);
+
+      setTimeout(() => {
+        setLocationError(
+          "Geolocation is not supported by your browser. Please enter your location manually."
+        );
+        setLocationDetectionState("error");
+        setShowLocationError(true);
+        setDetectingLocation(false);
+      }, waitTime);
       return;
     }
 
     try {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          try {
-            // Get coordinates
-            const latitude = position.coords.latitude;
-            const longitude = position.coords.longitude;
+      // Ensure we don't show error messages prematurely
+      let locationProcessed = false;
 
-            // Use reverse geocoding to get the city name
-            const response = await fetch(
-              `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`
-            );
+      // Set a timeout for the entire geolocation process - this is for the minimum spinner display
+      locationTimeoutRef.current = setTimeout(() => {
+        // Only trigger this if we're still detecting (no success callback happened)
+        if (locationDetectionState === "detecting") {
+          console.log("Location detection still in progress...");
+        }
+      }, 1000);
 
-            if (!response.ok) {
-              throw new Error("Failed to get location information");
-            }
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            // Mark that we've started processing the location
+            locationProcessed = true;
 
-            const data = await response.json();
-            const cityName =
-              data.city || data.locality || data.principalSubdivision;
+            try {
+              // Get coordinates
+              const latitude = position.coords.latitude;
+              const longitude = position.coords.longitude;
 
-            if (cityName) {
-              // Check if this location already exists
-              const locationExists = preferredLocations.some(
-                (loc) => loc.city.toLowerCase() === cityName.toLowerCase()
+              // Use reverse geocoding to get the city name
+              const response = await fetch(
+                `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`
               );
 
-              if (!locationExists) {
-                // Add as current location with coordinates, and mark any previous current as not current
-                setPreferredLocations([
-                  ...preferredLocations.map((loc) => ({
-                    ...loc,
-                    isCurrent: false,
-                  })),
-                  {
-                    city: cityName,
-                    isCurrent: true,
-                    latitude,
-                    longitude,
-                  },
-                ]);
+              if (!response.ok) {
+                handleGeolocationError(
+                  "Failed to get location information",
+                  true
+                );
+                return;
               }
 
-              // Clear any location error since we successfully got the location
-              setLocationError("");
-              setShowLocationError(false);
-              setLocationDetectionState("success");
-            } else {
-              setLocationError(
-                "Couldn't determine your city. Please enter it manually."
+              const data = await response.json();
+              const cityName =
+                data.city || data.locality || data.principalSubdivision;
+
+              if (cityName) {
+                // Check if this location already exists
+                const locationExists = preferredLocations.some(
+                  (loc) => loc.city.toLowerCase() === cityName.toLowerCase()
+                );
+
+                if (!locationExists) {
+                  // Add as current location with coordinates, and mark any previous current as not current
+                  setPreferredLocations([
+                    ...preferredLocations.map((loc) => ({
+                      ...loc,
+                      isCurrent: false,
+                    })),
+                    {
+                      city: cityName,
+                      isCurrent: true,
+                      latitude,
+                      longitude,
+                    },
+                  ]);
+                }
+
+                // Clear any location error since we successfully got the location
+                setLocationError("");
+                setShowLocationError(false);
+                setLocationDetectionState("success");
+
+                // Clear the timeout since we got a response
+                if (locationTimeoutRef.current) {
+                  clearTimeout(locationTimeoutRef.current);
+                  locationTimeoutRef.current = null;
+                }
+
+                // Ensure we display the spinner for at least the minimum time
+                const timeElapsed = Date.now() - locationDetectionStartTime;
+                const waitTime = Math.max(0, MIN_DETECTION_TIME - timeElapsed);
+
+                setTimeout(() => {
+                  setDetectingLocation(false);
+                }, waitTime);
+              } else {
+                handleGeolocationError(
+                  "Couldn't determine your city. Please enter it manually.",
+                  true
+                );
+              }
+            } catch {
+              handleGeolocationError(
+                "Failed to get your location details. Please enter it manually.",
+                true
               );
-              setLocationDetectionState("error");
-              setShowLocationError(true);
             }
-          } catch (error) {
-            console.error("Error getting location details:", error);
-            setLocationError(
-              "Failed to get your location details. Please enter it manually."
-            );
-            setLocationDetectionState("error");
-            setShowLocationError(true);
-          } finally {
-            setDetectingLocation(false);
-          }
-        },
-        (error) => {
-          // Attempt to detect Chrome extension interference
-          const errorString = String(error);
-          const isExtensionError =
-            errorString.includes("chrome-extension") ||
-            (error.message && error.message.includes("chrome-extension")) ||
-            document.URL.includes("chrome-extension");
+          },
+          (error) => {
+            // Only process error if we haven't already processed location successfully
+            if (locationProcessed) return;
 
-          // Handle specific error codes
-          let errorMessage = "";
-          if (isExtensionError) {
-            errorMessage =
-              "A browser extension is blocking location access. Try disabling extensions or using incognito mode.";
-          } else {
-            switch (error.code) {
-              case 1: // PERMISSION_DENIED
-                errorMessage =
-                  "Location permission denied. To enable location detection, please allow location access in your browser settings and try again.";
-                break;
-              case 2: // POSITION_UNAVAILABLE
-                errorMessage =
-                  "Your current position is unavailable. The GPS signal might be obstructed or your device may not have GPS capabilities.";
-                break;
-              case 3: // TIMEOUT
-                errorMessage =
-                  "Location request timed out. Please try again or enter your location manually.";
-                break;
-              default:
-                errorMessage =
-                  "Couldn't get your location. Please enter it manually.";
+            // Attempt to detect Chrome extension interference
+            const errorString = String(error);
+            const isExtensionError =
+              errorString.includes("chrome-extension") ||
+              (error.message && error.message.includes("chrome-extension")) ||
+              document.URL.includes("chrome-extension");
+
+            // Handle specific error codes
+            let errorMessage = "";
+            if (isExtensionError) {
+              errorMessage =
+                "A browser extension is blocking location access. Try disabling extensions or using incognito mode.";
+            } else {
+              switch (error.code) {
+                case 1: // PERMISSION_DENIED
+                  errorMessage =
+                    "Location permission denied. To enable location detection, please allow location access in your browser settings and try again.";
+                  break;
+                case 2: // POSITION_UNAVAILABLE
+                  errorMessage =
+                    "Your current position is unavailable. The GPS signal might be obstructed or your device may not have GPS capabilities.";
+                  break;
+                case 3: // TIMEOUT
+                  errorMessage =
+                    "Location request timed out. Please try again or enter your location manually.";
+                  break;
+                default:
+                  errorMessage =
+                    "Couldn't get your location. Please enter it manually.";
+              }
             }
-          }
 
-          setLocationError(errorMessage);
-          setLocationDetectionState("error");
-          // Only show error after detection is complete
-          setTimeout(() => {
-            setShowLocationError(true);
-            setDetectingLocation(false);
-          }, 500);
-        },
-        {
-          enableHighAccuracy: true, // Request the best possible position
-          timeout: 15000, // Wait up to 15 seconds (increased from 10)
-          maximumAge: 0, // Don't use a cached position
-        }
-      );
+            handleGeolocationError(errorMessage, false);
+          },
+          {
+            enableHighAccuracy: true, // Request the best possible position
+            timeout: 20000, // Wait up to 20 seconds for the device to respond
+            maximumAge: 0, // Don't use a cached position
+          }
+        );
+      }
     } catch {
-      setLocationError(
-        "An unexpected error occurred while trying to get your location. Please enter it manually."
+      handleGeolocationError(
+        "An unexpected error occurred while trying to get your location. Please enter it manually.",
+        false
       );
-      setLocationDetectionState("error");
-      // Add a slight delay before showing the error
-      setTimeout(() => {
-        setShowLocationError(true);
-        setDetectingLocation(false);
-      }, 500);
     }
+  };
+
+  // Helper function to handle geolocation errors with minimum display time
+  const handleGeolocationError = (
+    errorMessage: string,
+    fromSuccess: boolean
+  ) => {
+    const timeElapsed = Date.now() - locationDetectionStartTime;
+    const waitTime = Math.max(0, MIN_DETECTION_TIME - timeElapsed);
+
+    // Always wait at least the minimum time before showing error
+    setTimeout(() => {
+      // Clear the timeout since we're handling the error
+      if (locationTimeoutRef.current) {
+        clearTimeout(locationTimeoutRef.current);
+        locationTimeoutRef.current = null;
+      }
+
+      // If this error is from the success path (meaning we got coordinates but failed to get city),
+      // we should display it only if we're still in detecting state
+      if (fromSuccess && locationDetectionState !== "detecting") {
+        return;
+      }
+
+      setLocationError(errorMessage);
+      setLocationDetectionState("error");
+      setShowLocationError(true);
+      setDetectingLocation(false);
+    }, waitTime);
   };
 
   const skipOnboarding = () => {
@@ -483,12 +645,21 @@ export default function OnboardingPage() {
                         type="button"
                         onClick={detectCurrentLocation}
                         disabled={detectingLocation}
-                        className="w-full flex items-center justify-center gap-2 py-3 px-4 border border-primary-500 text-primary-600 rounded-lg font-medium hover:bg-primary-50 transition-colors mb-4"
+                        className={`w-full flex items-center justify-center gap-2 py-3 px-4 border rounded-lg font-medium transition-colors mb-4 ${
+                          detectingLocation
+                            ? "bg-gray-100 border-gray-300 text-gray-500 cursor-not-allowed"
+                            : "border-primary-500 text-primary-600 hover:bg-primary-50"
+                        }`}
                       >
                         {detectingLocation ? (
                           <>
                             <FaSpinner className="animate-spin mr-2" />
                             <span>Getting your location...</span>
+                          </>
+                        ) : locationDetectionState === "error" ? (
+                          <>
+                            <FaLocationArrow className="mr-2" />
+                            <span>Try again</span>
                           </>
                         ) : (
                           <>
@@ -517,36 +688,60 @@ export default function OnboardingPage() {
                         </div>
                         <input
                           type="text"
-                          placeholder="Enter a city"
+                          placeholder="Enter a city (min. 2 characters)"
                           className="w-full py-3 px-2 outline-none bg-white text-gray-800"
                           value={locationInput}
                           onChange={(e) => setLocationInput(e.target.value)}
-                          disabled={validatingCity}
                         />
-                        <button
-                          type="submit"
-                          disabled={validatingCity || !locationInput.trim()}
+                        <div
                           className={`p-3 ${
-                            validatingCity || !locationInput.trim()
+                            validatingCity
                               ? "bg-gray-100 text-gray-400"
-                              : "bg-primary-100 text-primary-700 hover:bg-primary-200"
+                              : "bg-primary-100 text-primary-700"
                           }`}
                         >
                           {validatingCity ? (
                             <FaSpinner className="animate-spin" size={14} />
+                          ) : locationInput !== debouncedLocationInput ? (
+                            <FaSpinner className="animate-spin" size={14} />
                           ) : (
                             <FaSearch size={14} />
                           )}
-                        </button>
+                        </div>
                       </div>
-                      {showLocationError &&
-                        locationError &&
-                        !detectingLocation && (
-                          <div className="text-red-600 text-xs mt-1 text-left pl-2">
-                            {locationError}
-                          </div>
-                        )}
                     </form>
+
+                    {/* Location search results */}
+                    {locationSearchResults.length > 0 && (
+                      <div className="max-w-md mx-auto mb-6 bg-white rounded-lg shadow-md border border-gray-200">
+                        <h3 className="text-sm font-medium text-gray-700 p-3 border-b border-gray-200">
+                          Select a location
+                        </h3>
+                        <ul className="divide-y divide-gray-200">
+                          {locationSearchResults.map((result, index) => (
+                            <li key={index}>
+                              <button
+                                className="w-full text-left p-3 hover:bg-gray-50 transition duration-150 flex items-start"
+                                onClick={() => addLocationFromResult(result)}
+                              >
+                                <FaMapMarkerAlt
+                                  className="flex-shrink-0 text-gray-400 mt-1 mr-2"
+                                  size={14}
+                                />
+                                <div>
+                                  <p className="font-medium text-gray-800">
+                                    {result.city}
+                                  </p>
+                                  <p className="text-xs text-gray-500 mt-1 line-clamp-2">
+                                    {result.displayName}
+                                  </p>
+                                </div>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
 
                     {/* Location chips/tags */}
                     <div className="max-w-md mx-auto mb-8">
@@ -563,7 +758,7 @@ export default function OnboardingPage() {
                             <FaMapMarkerAlt size={12} className="mr-1" />
                             {location.city}
                             {location.isCurrent && (
-                              <span className="text-xs ml-1">(current)</span>
+                              <span className="text-xs ml-1">(default)</span>
                             )}
                             <button
                               onClick={() => removeLocation(index)}
@@ -599,20 +794,7 @@ export default function OnboardingPage() {
                 {step === 3 && (
                   <div className="text-center px-4 py-8">
                     <div className="w-20 h-20 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center mx-auto mb-6">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-10 w-10"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M5 13l4 4L19 7"
-                        />
-                      </svg>
+                      <FaCheck className="h-10 w-10" />
                     </div>
                     <h2 className="text-2xl font-bold text-gray-900 mb-4">
                       Great choices!

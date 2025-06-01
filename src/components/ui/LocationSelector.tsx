@@ -511,14 +511,14 @@ export default function LocationSelector({
                 <span className="text-gray-800">{location.city}</span>
                 {location.isCurrent ? (
                   <span className="ml-2 text-xs bg-primary-100 text-primary-800 px-2 py-0.5 rounded-full">
-                    Current
+                    Default
                   </span>
                 ) : (
                   <button
                     onClick={() => setAsCurrentLocation(location.city)}
                     className="ml-2 text-xs text-primary-600 hover:text-primary-800 underline"
                   >
-                    Set as current
+                    Set as default
                   </button>
                 )}
               </div>

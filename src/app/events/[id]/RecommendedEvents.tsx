@@ -75,7 +75,9 @@ const RecommendedEvents = ({
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
-      <h2 className="text-2xl font-bold mb-6">Similar Events You Might Like</h2>
+      <h2 className="text-2xl font-bold mb-6 text-gray-900">
+        Similar Events You Might Like
+      </h2>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {events.map((event) => (
           <motion.div
@@ -92,7 +94,7 @@ const RecommendedEvents = ({
                   className="object-cover transition-transform duration-300 group-hover:scale-105"
                 />
                 {event.status === "onsale" && (
-                  <div className="absolute top-2 left-2 bg-secondary-500 text-white text-xs px-2 py-1 rounded-md">
+                  <div className="absolute top-2 left-2 bg-green-500 text-white text-xs px-2 py-1 rounded-md">
                     On Sale
                   </div>
                 )}
