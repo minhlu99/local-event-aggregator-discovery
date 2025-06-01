@@ -257,21 +257,27 @@ export default function Home() {
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setSearchTerm(value);
+    console.log("Search term changed:", value);
 
     // Clear any existing debounce timer
     if (searchDebounceRef.current) {
       clearTimeout(searchDebounceRef.current);
+      searchDebounceRef.current = null;
     }
 
     if (value.trim().length > 2) {
-      // Show loading state
+      // Show loading state immediately
       setIsSearching(true);
+      setShowSearchResults(true); // Always show the results container when searching
+      console.log("Searching initiated, debounce started...");
 
       // Set a new timer
       searchDebounceRef.current = setTimeout(() => {
+        console.log("Debounce complete, fetching results for:", value);
         fetchSearchResults(value);
       }, 500); // 500ms debounce delay
     } else {
+      console.log("Search term too short, clearing results");
       setSearchResults([]);
       setShowSearchResults(false);
       setIsSearching(false);
@@ -290,10 +296,16 @@ export default function Home() {
       }
 
       const data = await response.json();
+      console.log(
+        "Search results received:",
+        data.events?.length || 0,
+        "events"
+      );
 
       if (data.events && Array.isArray(data.events)) {
         setSearchResults(data.events);
-        setShowSearchResults(data.events.length > 0);
+        // Always show results if we have them, regardless of length
+        setShowSearchResults(true);
       } else {
         setSearchResults([]);
         setShowSearchResults(false);
@@ -322,6 +334,7 @@ export default function Home() {
         searchInputRef.current &&
         !searchInputRef.current.contains(event.target as Node)
       ) {
+        console.log("Click outside search area, hiding results");
         setShowSearchResults(false);
       }
     };
@@ -332,11 +345,27 @@ export default function Home() {
     };
   }, []);
 
-  // Clean up the debounce timer when component unmounts
+  // Debug whenever search results visibility changes
+  useEffect(() => {
+    console.log(
+      "showSearchResults changed:",
+      showSearchResults,
+      "with",
+      searchResults.length,
+      "results"
+    );
+  }, [showSearchResults, searchResults]);
+
+  // Clean up the timer when component unmounts
   useEffect(() => {
     return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
       if (searchDebounceRef.current) {
         clearTimeout(searchDebounceRef.current);
+        searchDebounceRef.current = null;
       }
     };
   }, []);
@@ -396,15 +425,6 @@ export default function Home() {
 
     // No need to trigger API calls here
   };
-
-  // Clean up the timer when component unmounts
-  useEffect(() => {
-    return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-      }
-    };
-  }, []);
 
   // Get current location
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -529,9 +549,18 @@ export default function Home() {
     }
   };
 
-  // Clear search
+  // Function to clear search
   const clearSearch = () => {
     setSearchTerm("");
+    setSearchResults([]);
+    setShowSearchResults(false);
+    setIsSearching(false);
+
+    // Clear any existing debounce timer
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
+      searchDebounceRef.current = null;
+    }
   };
 
   // Handle search submission
@@ -570,6 +599,91 @@ export default function Home() {
     },
   };
 
+  // Function to render search results at root level
+  const renderSearchResults = () => {
+    // Only show results container if searching or results should be shown
+    if (!searchInputRef.current || (!showSearchResults && !isSearching)) {
+      return null;
+    }
+
+    const inputRect = searchInputRef.current.getBoundingClientRect();
+
+    return (
+      <div
+        ref={searchResultsRef}
+        className="fixed bg-white shadow-xl rounded-md overflow-hidden z-[10001]"
+        style={{
+          top: inputRect.bottom + window.scrollY + 5,
+          left: inputRect.left + window.scrollX,
+          width: inputRect.width,
+          maxHeight: "60vh",
+          visibility: "visible",
+          display: "block",
+        }}
+      >
+        {isSearching ? (
+          // Loading spinner
+          <div className="py-6 text-center">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+            <p className="mt-2 text-gray-600">Searching events...</p>
+          </div>
+        ) : searchResults.length > 0 ? (
+          // Search results list
+          <ul className="py-1 max-h-60 overflow-y-auto">
+            {searchResults.map((event) => (
+              <li
+                key={event.id}
+                className="border-b border-gray-100 last:border-0"
+              >
+                <button
+                  onClick={() => goToEventDetail(event.id)}
+                  className="w-full text-left px-3 py-2 hover:bg-gray-100 transition-colors"
+                >
+                  <div className="flex items-start">
+                    {event.images && event.images[0] && (
+                      <div className="w-12 h-12 rounded overflow-hidden flex-shrink-0 mr-3">
+                        <Image
+                          src={event.images[0].url}
+                          alt={event.name}
+                          className="w-full h-full object-cover"
+                          width={48}
+                          height={48}
+                        />
+                      </div>
+                    )}
+                    <div className="flex-grow">
+                      <div className="font-medium text-gray-900 truncate">
+                        {event.name}
+                      </div>
+                      <div className="text-sm text-gray-500 flex items-center">
+                        <FaCalendar className="mr-1" size={10} />
+                        <span>{event.startDate || "Date TBA"}</span>
+                      </div>
+                      {event.venue && (
+                        <div className="text-sm text-gray-500 flex items-center">
+                          <FaMapMarkerAlt className="mr-1" size={10} />
+                          <span className="truncate">{event.venue.name}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          // No results message
+          <div className="py-6 text-center">
+            <div className="inline-block text-gray-400 mb-2">
+              <FaSearch size={24} />
+            </div>
+            <p className="text-gray-600">No events found</p>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const { motion } = Motion;
 
   return (
@@ -600,8 +714,19 @@ export default function Home() {
                     value={searchTerm}
                     onChange={handleSearchChange}
                     onFocus={() => {
-                      if (searchResults.length > 0) {
+                      console.log("Search input focused");
+                      // If we already have search results and search term is valid, show them
+                      if (
+                        searchTerm.trim().length > 2 &&
+                        searchResults.length > 0
+                      ) {
+                        console.log("Showing existing search results on focus");
                         setShowSearchResults(true);
+                      } else if (searchTerm.trim().length > 2) {
+                        // If term is valid but no results, trigger a search
+                        console.log("No existing results, fetching on focus");
+                        setIsSearching(true);
+                        fetchSearchResults(searchTerm);
                       }
                     }}
                   />
@@ -612,103 +737,6 @@ export default function Home() {
                     >
                       <FaTimes />
                     </button>
-                  )}
-
-                  {/* Search results dropdown */}
-                  {showSearchResults && (
-                    <div
-                      ref={searchResultsRef}
-                      className="absolute top-full left-0 right-0 mt-1 bg-white shadow-xl rounded-md z-[99999] overflow-hidden"
-                      style={{
-                        position: "fixed",
-                        top: searchInputRef.current
-                          ? searchInputRef.current.getBoundingClientRect()
-                              .bottom +
-                            window.scrollY +
-                            5
-                          : 0,
-                        left: searchInputRef.current
-                          ? searchInputRef.current.getBoundingClientRect()
-                              .left + window.scrollX
-                          : 0,
-                        width: searchInputRef.current
-                          ? searchInputRef.current.getBoundingClientRect().width
-                          : "auto",
-                        maxHeight: "60vh",
-                      }}
-                    >
-                      <ul className="py-1 max-h-60 overflow-y-auto">
-                        {searchResults.map((event) => (
-                          <li
-                            key={event.id}
-                            className="border-b border-gray-100 last:border-0"
-                          >
-                            <button
-                              onClick={() => goToEventDetail(event.id)}
-                              className="w-full text-left px-3 py-2 hover:bg-gray-100 transition-colors"
-                            >
-                              <div className="flex items-start">
-                                {event.images && event.images[0] && (
-                                  <div className="w-12 h-12 rounded overflow-hidden flex-shrink-0 mr-3">
-                                    <Image
-                                      src={event.images[0].url}
-                                      alt={event.name}
-                                      className="w-full h-full object-cover"
-                                      width={48}
-                                      height={48}
-                                    />
-                                  </div>
-                                )}
-                                <div className="flex-grow">
-                                  <div className="font-medium text-gray-900 truncate">
-                                    {event.name}
-                                  </div>
-                                  <div className="text-sm text-gray-500 flex items-center">
-                                    <FaCalendar className="mr-1" size={10} />
-                                    <span>{event.startDate || "Date TBA"}</span>
-                                  </div>
-                                  {event.venue && (
-                                    <div className="text-sm text-gray-500 flex items-center">
-                                      <FaMapMarkerAlt
-                                        className="mr-1"
-                                        size={10}
-                                      />
-                                      <span className="truncate">
-                                        {event.venue.name}
-                                      </span>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {/* Loading indicator */}
-                  {isSearching && (
-                    <div
-                      className="fixed left-0 right-0 mt-1 bg-white shadow-xl rounded-md z-[10001] py-4 text-center text-gray-500"
-                      style={{
-                        top: searchInputRef.current
-                          ? searchInputRef.current.getBoundingClientRect()
-                              .bottom +
-                            window.scrollY +
-                            5
-                          : 0,
-                        left: searchInputRef.current
-                          ? searchInputRef.current.getBoundingClientRect()
-                              .left + window.scrollX
-                          : 0,
-                        width: searchInputRef.current
-                          ? searchInputRef.current.getBoundingClientRect().width
-                          : "auto",
-                      }}
-                    >
-                      <div className="animate-pulse">Searching...</div>
-                    </div>
                   )}
                 </div>
 
@@ -1089,6 +1117,9 @@ export default function Home() {
           </div>
         </section>
       </main>
+
+      {/* Render search results at root level */}
+      {renderSearchResults()}
     </>
   );
 }

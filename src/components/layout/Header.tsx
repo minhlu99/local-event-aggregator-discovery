@@ -211,21 +211,21 @@ const Header = () => {
                     >
                       <Link
                         href="/profile"
-                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left flex items-center"
+                        className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left flex items-center"
                         onClick={() => setIsProfileMenuOpen(false)}
                       >
                         <FaUser className="mr-2" /> Profile
                       </Link>
                       <Link
                         href="/create-event"
-                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left flex items-center"
+                        className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left flex items-center"
                         onClick={() => setIsProfileMenuOpen(false)}
                       >
                         <FaPlus className="mr-2" /> Create Event
                       </Link>
                       <Link
                         href="/settings"
-                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left flex items-center"
+                        className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left flex items-center"
                         onClick={() => setIsProfileMenuOpen(false)}
                       >
                         <svg
@@ -252,7 +252,7 @@ const Header = () => {
                       </Link>
                       <button
                         onClick={handleLogout}
-                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left flex items-center"
+                        className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left flex items-center"
                       >
                         <FaSignOutAlt className="mr-2" /> Sign out
                       </button>
