@@ -70,8 +70,7 @@ const EventsFilter = () => {
   const currentCategory = searchParams?.get("classificationId") || "";
   const currentDate = searchParams?.get("date") || "";
   const currentLocation = searchParams?.get("location") || "";
-  const currentLat = searchParams?.get("latlong")?.split(",")[0] || "";
-  const currentLon = searchParams?.get("latlong")?.split(",")[1] || "";
+  const currentLatLong = searchParams?.get("latlong") || "";
 
   // Initialize location input from URL params
   useEffect(() => {
@@ -274,16 +273,23 @@ const EventsFilter = () => {
     setLocationInput(locationName);
     setShowSuggestions(false);
 
-    // Set location parameters
-    setFilterParam("location", locationName);
+    // Set location parameters in specific order to ensure correct handling
+    // First set latlong which will ensure radius and unit get defaults
     setFilterParam("latlong", `${result.lat},${result.lon}`);
-    setFilterParam("radius", "25");
-    setFilterParam("unit", "miles");
+    // Then set the location name
+    setFilterParam("location", locationName);
 
     // Auto-close filters on mobile after selection
     if (window.innerWidth < 768) {
       setIsOpen(false);
     }
+  };
+
+  // Handle clearing location
+  const handleClearLocation = () => {
+    setLocationInput("");
+    // Clear location param which will trigger removal of all location-related params
+    setFilterParam("location", "");
   };
 
   const handleFilterChange = (name: string, value: string) => {
@@ -487,24 +493,44 @@ const EventsFilter = () => {
           </div>
 
           <div className="relative px-2 pb-3">
-            <input
-              ref={locationInputRef}
-              type="text"
-              placeholder="Enter city or address"
-              value={locationInput}
-              onChange={(e) => setLocationInput(e.target.value)}
-              onFocus={() => setShowSuggestions(locationSuggestions.length > 0)}
-              className="w-full p-2 pl-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-base text-gray-700"
-            />
+            <div className="flex relative">
+              <input
+                ref={locationInputRef}
+                type="text"
+                placeholder="Enter city or address"
+                value={locationInput}
+                onChange={(e) => setLocationInput(e.target.value)}
+                onFocus={() =>
+                  setShowSuggestions(locationSuggestions.length > 0)
+                }
+                onBlur={() => {
+                  // Delay hiding suggestions to allow click events to register
+                  setTimeout(() => setShowSuggestions(false), 200);
+                }}
+                className="w-full p-2 pl-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-base text-gray-700"
+                aria-label="Location search"
+              />
 
-            {/* Loading indicator */}
+              {locationInput && (
+                <button
+                  className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
+                  onClick={handleClearLocation}
+                  aria-label="Clear location"
+                  type="button"
+                >
+                  <FaTimes />
+                </button>
+              )}
+            </div>
+
+            {/* Loading indicator - shown when location search is in progress */}
             {isSearchingLocation && (
               <div className="absolute right-3 top-2.5">
                 <FaSpinner className="animate-spin text-primary-500" />
               </div>
             )}
 
-            {/* Location suggestions shown in absolute position */}
+            {/* Location suggestions */}
             {showSuggestions && locationSuggestions.length > 0 && (
               <div
                 ref={suggestionRef}
@@ -547,15 +573,53 @@ const EventsFilter = () => {
             )}
           </div>
 
-          {/* Current location indicator */}
-          {currentLat && currentLon && (
-            <div className="mt-2 text-xs text-gray-500 flex items-center">
-              <FaMapMarkerAlt className="mr-1 text-primary-500" />
-              <span>Using precise location coordinates for search results</span>
+          {/* Selected location indicator */}
+          {currentLatLong && (
+            <div className="mt-3 p-2 bg-primary-50 rounded-md border border-primary-100">
+              <div className="text-sm text-gray-700 flex items-center">
+                <FaMapMarkerAlt className="mr-2 text-primary-600 flex-shrink-0" />
+                <div>
+                  <div className="font-medium">
+                    {currentLocation || "Selected location"}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    Searching within {searchParams?.get("radius") || "25"}{" "}
+                    {searchParams?.get("unit") || "miles"}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Location radius selector */}
+          {currentLatLong && (
+            <div className="mt-3">
+              <label className="text-sm font-medium text-gray-700 block mb-1">
+                Search radius
+              </label>
+              <select
+                className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                value={searchParams?.get("radius") || "25"}
+                onChange={(e) => {
+                  // Update the radius parameter
+                  setFilterParam("radius", e.target.value);
+                  // Ensure unit parameter exists
+                  if (!searchParams?.has("unit")) {
+                    setFilterParam("unit", "miles");
+                  }
+                }}
+                aria-label="Search radius"
+              >
+                <option value="5">5 miles</option>
+                <option value="10">10 miles</option>
+                <option value="25">25 miles</option>
+                <option value="50">50 miles</option>
+                <option value="100">100 miles</option>
+              </select>
             </div>
           )}
         </Fragment>
-
+        {/* 
         {hasActiveFilters && (
           <div className="pt-4 border-t">
             <button
@@ -565,7 +629,7 @@ const EventsFilter = () => {
               Clear all filters
             </button>
           </div>
-        )}
+        )} */}
 
         {/* Mobile-only apply button */}
         {isOpen && (
