@@ -1,13 +1,18 @@
 "use client";
 
 import { Event } from "@/types";
+import {
+  createGoogleCalendarUrl,
+  getFormattedEventLocation,
+} from "@/utils/calendar";
 import { formatDate, formatTime, isEventUpcoming } from "@/utils/date";
 import { isEventFavorite, toggleFavorite } from "@/utils/favorites";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   FaCalendarAlt,
+  FaCalendarPlus,
   FaClock,
   FaHeart,
   FaMapMarkerAlt,
@@ -32,6 +37,8 @@ const EventCard = ({
 }: EventCardProps) => {
   const [isHovered, setIsHovered] = useState(false);
   const [isSaved, setIsSaved] = useState(externalIsSaved);
+  const [showCalendarTooltip, setShowCalendarTooltip] = useState(false);
+  const calendarTooltipTimeout = useRef<NodeJS.Timeout | null>(null);
 
   // Check if event is saved when component mounts
   useEffect(() => {
@@ -54,6 +61,42 @@ const EventCard = ({
     // Otherwise, handle it internally
     const { isFavorite } = toggleFavorite(event);
     setIsSaved(isFavorite);
+  };
+
+  const handleAddToCalendarClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Create location string from venue data
+    const location = getFormattedEventLocation(event.venue);
+
+    // Generate Google Calendar URL
+    const calendarUrl = createGoogleCalendarUrl({
+      name: event.name,
+      description: event.description,
+      startDate: event.startDate,
+      startTime: event.startTime,
+      endDate: event.endDate,
+      endTime: event.endTime,
+      location,
+      timezone: event.timezone,
+    });
+
+    // Open Google Calendar in a new tab
+    window.open(calendarUrl, "_blank");
+  };
+
+  const handleCalendarMouseEnter = () => {
+    calendarTooltipTimeout.current = setTimeout(() => {
+      setShowCalendarTooltip(true);
+    }, 300);
+  };
+
+  const handleCalendarMouseLeave = () => {
+    if (calendarTooltipTimeout.current) {
+      clearTimeout(calendarTooltipTimeout.current);
+    }
+    setShowCalendarTooltip(false);
   };
 
   // Find the best image to display
@@ -260,7 +303,10 @@ const EventCard = ({
               style={{ transform: isHovered ? "scale(1.05)" : "scale(1)" }}
             />
           </div>
-          <div className="absolute top-3 right-3 z-10" suppressHydrationWarning>
+          <div
+            className="absolute top-3 right-3 z-10 flex flex-col gap-2"
+            suppressHydrationWarning
+          >
             <motion.button
               onClick={handleSaveClick}
               whileHover={{ scale: 1.1 }}
@@ -276,6 +322,25 @@ const EventCard = ({
                 <FaRegHeart />
               )}
             </motion.button>
+            <div className="relative">
+              <motion.button
+                onClick={handleAddToCalendarClick}
+                onMouseEnter={handleCalendarMouseEnter}
+                onMouseLeave={handleCalendarMouseLeave}
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+                className="bg-white p-2 rounded-full shadow-md text-gray-700 hover:text-green-500 focus:outline-none"
+                aria-label="Add to Google Calendar"
+              >
+                <FaCalendarPlus />
+              </motion.button>
+              {showCalendarTooltip && (
+                <div className="absolute right-full mr-2 top-1/2 -translate-y-1/2 bg-gray-800 text-white text-xs rounded py-1 px-2 whitespace-nowrap">
+                  Add to Google Calendar
+                  <div className="absolute top-1/2 -translate-y-1/2 right-0 translate-x-full border-8 border-transparent border-l-gray-800"></div>
+                </div>
+              )}
+            </div>
           </div>
           {getStatusBadge()}
           <div

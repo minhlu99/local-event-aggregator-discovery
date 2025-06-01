@@ -70,7 +70,7 @@ export default function ClientSearchPage() {
 
   // Location state
   const [locationInput, setLocationInput] = useState(
-    getParam("city") || getParam("location") || ""
+    getParam("location") || ""
   );
   const [isSearchingLocation, setIsSearchingLocation] = useState(false);
   const [locationSuggestions, setLocationSuggestions] = useState<
@@ -82,7 +82,7 @@ export default function ClientSearchPage() {
     lon: string;
   } | null>(null);
   const [selectedLocation, setSelectedLocation] = useState(
-    getParam("city") || getParam("location") || ""
+    getParam("location") || ""
   );
 
   // Debounce timer for location search
@@ -94,9 +94,12 @@ export default function ClientSearchPage() {
     setSearchTerm(getParam("search"));
     setCategory(getParam("category"));
     setDate(getParam("date"));
-    const locationParam = getParam("city") || getParam("location") || "";
+
+    // Handle location parameters
+    const locationParam = getParam("location") || "";
     setLocationInput(locationParam);
     setSelectedLocation(locationParam);
+
     setSort(getParam("sort") || "relevance,desc");
 
     // Check for lat/long coordinates
@@ -188,6 +191,17 @@ export default function ClientSearchPage() {
       lat: result.lat.toString(),
       lon: result.lon.toString(),
     });
+
+    // Trigger a search with the new location
+    const params = new URLSearchParams();
+    if (searchTerm) params.set("search", searchTerm);
+    if (category) params.set("category", category);
+    if (date) params.set("date", date);
+    params.set("location", locationName);
+    params.set("latlong", `${result.lat},${result.lon}`);
+    if (sort && sort !== "relevance,desc") params.set("sort", sort);
+
+    router.push(`/search?${params.toString()}`);
   };
 
   // Handle closing suggestions when clicking outside
@@ -269,7 +283,8 @@ export default function ClientSearchPage() {
           );
           startDateTime = today.toISOString().split(".")[0] + "Z";
           endDateTime = endOfMonth.toISOString().split(".")[0] + "Z";
-        } else if (date === "upcoming") {
+        } else {
+          // Default case (empty string = "Upcoming")
           startDateTime = today.toISOString().split(".")[0] + "Z";
         }
 
@@ -292,12 +307,8 @@ export default function ClientSearchPage() {
           params.radius = 25; // Default radius
           params.unit = "miles";
         } else if (selectedLocation) {
-          // Otherwise use city/postal code
-          if (/^\d+$/.test(selectedLocation)) {
-            params.postalCode = selectedLocation;
-          } else {
-            params.city = selectedLocation;
-          }
+          // Use city name
+          params.city = selectedLocation;
         }
 
         const result = await fetchEvents(params);
@@ -458,11 +469,10 @@ export default function ClientSearchPage() {
               onChange={(e) => handleStringInputChange(setDate, e.target.value)}
               className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-900"
             >
-              <option value="">Any Time</option>
+              <option value="">Upcoming</option>
               <option value="today">Today</option>
               <option value="this-week">This Week</option>
               <option value="this-month">This Month</option>
-              <option value="upcoming">Upcoming</option>
             </select>
           </div>
 
@@ -475,7 +485,7 @@ export default function ClientSearchPage() {
               <input
                 ref={locationInputRef}
                 type="text"
-                placeholder="City or postal code"
+                placeholder="City name"
                 value={locationInput}
                 onChange={(e) => setLocationInput(e.target.value)}
                 onKeyPress={handleLocationKeyPress}
@@ -493,7 +503,7 @@ export default function ClientSearchPage() {
 
               {/* Location suggestions */}
               {showSuggestions && locationSuggestions.length > 0 && (
-                <div className="absolute z-30 left-0 right-0 top-full mt-1 bg-white shadow-lg rounded-md border border-gray-200 max-h-60 overflow-y-auto">
+                <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-white shadow-lg rounded-md border border-gray-200 max-h-60 overflow-y-auto">
                   {locationSuggestions.map((result, index) => {
                     // Extract readable location name
                     const locationName =

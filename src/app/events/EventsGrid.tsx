@@ -3,17 +3,22 @@
 import EventCard from "@/components/events/EventCard";
 import { Event } from "@/types";
 import * as Motion from "framer-motion";
-import { useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "react-hot-toast";
+import { useEvents } from "./EventsContext";
 
 const EventsGrid = () => {
-  const searchParams = useSearchParams();
+  const { filterParams, isFiltering, setIsFiltering } = useEvents();
   const [events, setEvents] = useState<Event[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [savedEvents, setSavedEvents] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
   const { motion } = Motion;
 
   // Only render after client-side hydration to avoid hydration mismatch
@@ -38,39 +43,33 @@ const EventsGrid = () => {
     loadSavedEvents();
   }, [mounted]);
 
-  useEffect(() => {
-    if (!mounted) return;
-
-    const fetchEvents = async () => {
-      setIsLoading(true);
+  const fetchEvents = useCallback(
+    async (pageNumber = 0, append = false) => {
+      if (pageNumber === 0) {
+        setIsLoading(true);
+      } else {
+        setIsLoadingMore(true);
+      }
       setError(null);
-      try {
-        // Build the query string from search params
-        const queryParams = new URLSearchParams();
 
-        // Get all parameters from the URL and pass them through
-        // This ensures we use the latest API parameter structure
-        if (searchParams) {
-          searchParams.forEach((value, key) => {
-            // Special handling for location -> city mapping
-            if (key === "location") {
-              queryParams.set("city", value);
-            } else {
-              queryParams.set(key, value);
-            }
-          });
-        }
+      try {
+        // Build the query string from filter params
+        const queryParams = new URLSearchParams(filterParams.toString());
 
         // Default to showing only upcoming events if no date filter is specified
         if (!queryParams.has("date") && !queryParams.has("includePast")) {
           queryParams.set("date", "upcoming");
         }
 
+        // Add pagination parameters
+        queryParams.set("page", pageNumber.toString());
+        queryParams.set("size", "12"); // Number of items per page
+
         console.log("Fetching events with params:", queryParams.toString());
 
         // Call our API endpoint with a timeout
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
 
         try {
           const response = await fetch(
@@ -97,7 +96,21 @@ const EventsGrid = () => {
             throw new Error("Invalid response format from API");
           }
 
-          setEvents(data.events);
+          // Filter out events with status "offsale"
+          const filteredEvents = data.events.filter(
+            (event: Event) => event.status !== "offsale"
+          );
+
+          // Check if we have more pages to load
+          const totalPages = data.page?.totalPages || 0;
+          setHasMore(pageNumber < totalPages - 1 && filteredEvents.length > 0);
+
+          // Update events state (append or replace)
+          if (append) {
+            setEvents((prevEvents) => [...prevEvents, ...filteredEvents]);
+          } else {
+            setEvents(filteredEvents);
+          }
         } catch (fetchError: unknown) {
           if (fetchError instanceof Error && fetchError.name === "AbortError") {
             throw new Error("Request timed out. Please try again.");
@@ -106,8 +119,6 @@ const EventsGrid = () => {
         } finally {
           clearTimeout(timeoutId);
         }
-
-        setIsLoading(false);
       } catch (error: unknown) {
         console.error("Error fetching events:", error);
         setError(
@@ -115,12 +126,56 @@ const EventsGrid = () => {
             ? error.message
             : "An error occurred while fetching data"
         );
+      } finally {
         setIsLoading(false);
+        setIsLoadingMore(false);
+        setIsFiltering(false);
+      }
+    },
+    [filterParams, setIsFiltering]
+  );
+
+  // Initial fetch and when filter params change
+  useEffect(() => {
+    if (!mounted) return;
+    // Reset page when filter params change
+    setPage(0);
+    setHasMore(true);
+    fetchEvents(0, false);
+  }, [filterParams, mounted, fetchEvents]);
+
+  // Setup intersection observer for infinite scrolling
+  useEffect(() => {
+    if (!mounted) return;
+
+    const observerCallback = (entries: IntersectionObserverEntry[]) => {
+      const [entry] = entries;
+      if (entry.isIntersecting && hasMore && !isLoading && !isLoadingMore) {
+        // Load more data when the user scrolls to the bottom
+        const nextPage = page + 1;
+        setPage(nextPage);
+        fetchEvents(nextPage, true);
       }
     };
 
-    fetchEvents();
-  }, [searchParams, mounted]);
+    const observer = new IntersectionObserver(observerCallback, {
+      root: null,
+      rootMargin: "0px",
+      threshold: 0.5,
+    });
+
+    if (loadMoreRef.current) {
+      observer.observe(loadMoreRef.current);
+    }
+
+    observerRef.current = observer;
+
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+      }
+    };
+  }, [mounted, hasMore, isLoading, isLoadingMore, page, fetchEvents]);
 
   // Function to toggle saved/favorited events
   const handleSaveToggle = (eventId: string) => {
@@ -220,11 +275,12 @@ const EventsGrid = () => {
     );
   }
 
-  if (isLoading) {
+  // Show loading indicator when filters are being applied or initial load
+  if ((isLoading && page === 0) || isFiltering) {
     return <EventsGridSkeleton />;
   }
 
-  if (error) {
+  if (error && events.length === 0) {
     const isApiKeyError =
       typeof error === "string" &&
       (error.includes("Invalid API key") || error.includes("API key"));
@@ -334,6 +390,27 @@ const EventsGrid = () => {
           </motion.div>
         ))}
       </motion.div>
+
+      {/* Loading indicator for more events */}
+      {hasMore && (
+        <div ref={loadMoreRef} className="w-full py-8 flex justify-center">
+          {isLoadingMore ? (
+            <div className="flex flex-col items-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-600 mb-2"></div>
+              <p className="text-gray-500">Loading more events...</p>
+            </div>
+          ) : (
+            <div className="h-8 opacity-0">Load more</div>
+          )}
+        </div>
+      )}
+
+      {/* End of results message */}
+      {!hasMore && events.length > 0 && (
+        <div className="w-full py-8 text-center text-gray-500">
+          No more events to load
+        </div>
+      )}
     </div>
   );
 };
