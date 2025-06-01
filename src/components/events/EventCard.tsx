@@ -299,7 +299,7 @@ const EventCard = ({
               alt={event.name}
               fill
               sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-              className="object-cover transition-transform duration-500"
+              className="object-cover transition-transform duration-200"
               style={{ transform: isHovered ? "scale(1.05)" : "scale(1)" }}
             />
           </div>
