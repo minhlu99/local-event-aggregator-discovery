@@ -7,8 +7,9 @@ import {
   FaBasketballBall,
   FaCheck,
   FaFilm,
-  FaGlasses,
+  FaGlassCheers,
   FaMusic,
+  FaQuestion,
   FaSpinner,
   FaTheaterMasks,
 } from "react-icons/fa";
@@ -35,6 +36,9 @@ interface CategoryResponse {
 const getCategoryIcon = (categoryName: string) => {
   const name = categoryName.toLowerCase();
 
+  if (name.includes("miscellaneous"))
+    return <FaGlassCheers className="h-6 w-6" />;
+
   if (name.includes("music")) return <FaMusic className="h-6 w-6" />;
   if (name.includes("sport")) return <FaBasketballBall className="h-6 w-6" />;
   if (
@@ -47,7 +51,7 @@ const getCategoryIcon = (categoryName: string) => {
     return <FaFilm className="h-6 w-6" />;
 
   // Default icon for other categories
-  return <FaGlasses className="h-6 w-6" />;
+  return <FaQuestion className="h-6 w-6" />;
 };
 
 export default function CategorySelection({

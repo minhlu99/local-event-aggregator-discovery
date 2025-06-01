@@ -8,7 +8,9 @@ import { notFound } from "next/navigation";
 import {
   FaCalendarAlt,
   FaClock,
+  FaExclamationTriangle,
   FaGlobe,
+  FaHashtag,
   FaMapMarkerAlt,
   FaMoneyBill,
   FaTag,
@@ -22,6 +24,15 @@ interface PageProps {
   params: Promise<{ id: string }>;
 }
 
+// Define the API error interface
+interface ApiError {
+  response?: {
+    status?: number;
+    data?: unknown;
+  };
+  message?: string;
+}
+
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
@@ -31,8 +42,6 @@ export async function generateMetadata({
     // Fetch the event from Ticketmaster API
     const tmEvent = await fetchEventById(id);
     const event = mapTicketmasterEventToAppEvent(tmEvent);
-
-    console.log("event.startTime", event.startTime);
 
     // Find the best image for OpenGraph
     const bestImage =
@@ -59,8 +68,8 @@ export async function generateMetadata({
   } catch (error) {
     console.error("Error fetching event metadata:", error);
     return {
-      title: "Event Not Found | Local Event Aggregator & Discovery",
-      description: "The event you are looking for could not be found.",
+      title: "Event | Local Event Aggregator & Discovery",
+      description: "View event details.",
     };
   }
 }
@@ -85,6 +94,59 @@ const getBestEventImage = (
   // Last resort: just use the first image
   return images[0].url;
 };
+
+// Error component for API errors
+function ErrorDisplay({ error }: { error: ApiError }) {
+  const isRateLimited = error?.response?.status === 429;
+  const errorMessage = isRateLimited
+    ? "We've hit the rate limit with our data provider."
+    : "There was an error loading this event.";
+  const errorSubMessage = isRateLimited
+    ? "Please wait a few minutes and try again."
+    : "Please try again later or search for another event.";
+
+  return (
+    <>
+      <Header />
+      <main className="min-h-screen bg-gray-50 py-16">
+        <div className="container mx-auto px-4">
+          <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-md p-8 text-center">
+            <div className="text-amber-500 mb-4 flex justify-center">
+              <FaExclamationTriangle size={48} />
+            </div>
+            <h1 className="text-2xl md:text-3xl font-bold mb-4">
+              {errorMessage}
+            </h1>
+            <p className="text-gray-600 mb-8">{errorSubMessage}</p>
+            <div className="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4 justify-center">
+              <Link
+                href="/events"
+                className="px-6 py-3 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 transition-colors"
+              >
+                Browse All Events
+              </Link>
+              <Link
+                href="/"
+                className="px-6 py-3 border border-gray-300 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+              >
+                Go to Homepage
+              </Link>
+            </div>
+            <div className="mt-8 text-gray-500 text-sm">
+              <p>Error code: {error?.response?.status || "Unknown"}</p>
+              {isRateLimited && (
+                <p className="mt-1">
+                  Our service is experiencing high traffic. Please try again in
+                  a few minutes.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      </main>
+    </>
+  );
+}
 
 export default async function EventPage({ params }: PageProps) {
   const { id } = await params;
@@ -195,7 +257,9 @@ export default async function EventPage({ params }: PageProps) {
               {/* Main Content */}
               <div className="md:w-2/3">
                 <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-                  <h2 className="text-2xl font-bold mb-4">About This Event</h2>
+                  <h2 className="text-2xl font-bold mb-4 text-gray-900">
+                    About This Event
+                  </h2>
                   <p className="text-gray-700 mb-6 whitespace-pre-line">
                     {event.description}
                   </p>
@@ -203,7 +267,9 @@ export default async function EventPage({ params }: PageProps) {
                   {/* Attractions/Performers */}
                   {event.attractions && event.attractions.length > 0 && (
                     <div className="mb-6">
-                      <h3 className="text-xl font-bold mb-3">Performers</h3>
+                      <h3 className="text-xl font-bold mb-3 text-gray-900">
+                        Performers
+                      </h3>
                       <div className="flex items-start">
                         <FaUsers className="text-primary-500 mt-1 mr-3" />
                         <div>
@@ -231,24 +297,35 @@ export default async function EventPage({ params }: PageProps) {
                   )}
 
                   {/* Tags */}
-                  <div className="flex flex-wrap gap-2 mb-6">
-                    {[event.genre.name, event.subGenre.name]
-                      .filter(Boolean)
-                      .filter(
-                        (value, index, self) => self.indexOf(value) === index
-                      ) // Remove duplicates
-                      .map((tag) => (
-                        <Link
-                          key={tag}
-                          href={`/events?search=${tag}`}
-                          className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm hover:bg-gray-200 transition-colors"
-                        >
-                          #{tag}
-                        </Link>
-                      ))}
+                  <div className="mb-6">
+                    <h3 className="text-xl font-bold mb-3 text-gray-900">
+                      Tags
+                    </h3>
+                    <div className="flex items-start">
+                      <FaHashtag className="text-primary-500 mt-1 mr-3" />
+                      <div className="flex flex-wrap gap-2">
+                        {[event.genre.name, event.subGenre.name]
+                          .filter(Boolean)
+                          .filter(
+                            (value, index, self) =>
+                              self.indexOf(value) === index
+                          ) // Remove duplicates
+                          .map((tag) => (
+                            <Link
+                              key={tag}
+                              href={`/events?search=${tag}`}
+                              className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm hover:bg-gray-200 transition-colors"
+                            >
+                              #{tag}
+                            </Link>
+                          ))}
+                      </div>
+                    </div>
                   </div>
 
-                  <h3 className="text-xl font-bold mb-3">Date and Time</h3>
+                  <h3 className="text-xl font-bold mb-3 text-gray-900">
+                    Date and Time
+                  </h3>
                   <div className="flex items-start mb-6">
                     <FaCalendarAlt className="text-primary-500 mt-1 mr-3" />
                     <div>
@@ -285,7 +362,9 @@ export default async function EventPage({ params }: PageProps) {
                     </div>
                   </div>
 
-                  <h3 className="text-xl font-bold mb-3">Location</h3>
+                  <h3 className="text-xl font-bold mb-3 text-gray-900">
+                    Location
+                  </h3>
                   <div className="flex items-start mb-6">
                     <FaMapMarkerAlt className="text-primary-500 mt-1 mr-3" />
                     <div>
@@ -380,7 +459,7 @@ export default async function EventPage({ params }: PageProps) {
                           )}
                         </h3>
                       ) : (
-                        <h3 className="text-2xl font-bold">
+                        <h3 className="text-2xl font-bold text-gray-900">
                           Pricing Information
                         </h3>
                       )}
@@ -498,14 +577,23 @@ export default async function EventPage({ params }: PageProps) {
 
                   {/* Buy Tickets Button */}
                   {event.url && (
-                    <Link
-                      href={event.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block w-full bg-secondary-600 hover:bg-secondary-700 text-white font-bold py-3 px-4 rounded-lg text-center transition-colors mt-4"
-                    >
-                      Get Tickets
-                    </Link>
+                    <>
+                      <div className="mt-6 mb-2 relative">
+                        <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-blue-500 rounded-lg blur opacity-75 animate-pulse"></div>
+                        <Link
+                          href={event.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="relative w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold py-4 px-4 rounded-lg text-center shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-300 flex items-center justify-center text-lg"
+                        >
+                          <FaTicketAlt className="mr-2 animate-bounce" />
+                          Get Tickets
+                        </Link>
+                      </div>
+                      <p className="text-center text-sm text-gray-500 mt-2">
+                        Purchase tickets from official provider
+                      </p>
+                    </>
                   )}
                 </div>
               </div>
@@ -516,6 +604,12 @@ export default async function EventPage({ params }: PageProps) {
     );
   } catch (error) {
     console.error("Error fetching event:", error);
+
+    // Check if it's a 429 rate limit error or another error
+    if ((error as ApiError)?.response?.status === 429) {
+      return <ErrorDisplay error={error as ApiError} />;
+    }
+
     notFound();
   }
 }

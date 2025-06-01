@@ -28,8 +28,12 @@ const Header = () => {
   const pathname = usePathname();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState<User | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
+    // Set mounted state to true once the component is mounted on the client
+    setIsMounted(true);
+
     // Check if user is logged in when component mounts
     const loggedIn = localStorage.getItem("isLoggedIn") === "true";
     setIsLoggedIn(loggedIn);
@@ -59,17 +63,19 @@ const Header = () => {
   const navLinks = [
     { path: "/", label: "Home" },
     { path: "/events", label: "Events" },
-    { path: "/recommendations", label: "For You" },
     { path: "/search", label: "Search" },
+    { path: "/recommendations", label: "For You" },
   ];
 
   const isActive = (path: string) => pathname === path;
 
+  // Return null or a loading state until the component is mounted on the client
+  if (!isMounted) {
+    return <div className="bg-white shadow-sm h-16" />;
+  }
+
   return (
-    <header
-      className="bg-white shadow-sm sticky top-0 z-50"
-      suppressHydrationWarning
-    >
+    <header className="bg-white shadow-sm sticky top-0 z-50">
       <style jsx global>{`
         @keyframes colorShift {
           0% {
@@ -107,27 +113,26 @@ const Header = () => {
           display: inline-block;
         }
       `}</style>
-      <div className="container mx-auto px-4 py-3" suppressHydrationWarning>
-        <div
-          className="flex items-center justify-between"
-          suppressHydrationWarning
-        >
+      <div className="container mx-auto px-4 py-3">
+        <div className="flex items-center justify-between">
           <Link href="/" className="flex items-center space-x-2">
             <motion.div
               whileHover={{ rotate: 10 }}
               className="text-primary-600"
-              suppressHydrationWarning
             >
-              <FaCalendar size={24} />
+              <Image
+                src="/icons/calendar-logo.svg"
+                alt="EventFinder Logo"
+                width={24}
+                height={24}
+                className="w-6 h-6"
+              />
             </motion.div>
             <span className="font-bold text-xl text-gray-900">EventFinder</span>
           </Link>
 
           {/* Desktop Navigation */}
-          <nav
-            className="hidden md:flex items-center space-x-8"
-            suppressHydrationWarning
-          >
+          <nav className="hidden md:flex items-center space-x-8">
             {navLinks.map((link) => (
               <Link
                 key={link.path}
@@ -147,13 +152,7 @@ const Header = () => {
                       className="mr-1 text-primary-600"
                       initial={false}
                     >
-                      <span
-                        className={
-                          !isActive(link.path)
-                            ? "animate-thumbs-up animate-color-shift"
-                            : ""
-                        }
-                      >
+                      <span className="animate-thumbs-up animate-color-shift">
                         <FaThumbsUp
                           className={
                             isActive(link.path)
@@ -167,18 +166,11 @@ const Header = () => {
                     <span
                       className={
                         isActive(link.path)
-                          ? "text-primary-600"
-                          : "font-semibold text-primary-600 relative"
+                          ? "text-primary-600 font-bold animate-color-shift"
+                          : "font-semibold text-primary-600 relative animate-color-shift"
                       }
                     >
-                      {link.path === "/recommendations" &&
-                      !isActive(link.path) ? (
-                        <span className="text-primary-600 font-bold animate-color-shift">
-                          For You
-                        </span>
-                      ) : (
-                        link.label
-                      )}
+                      {link.label}
                     </span>
                   </>
                 ) : (
@@ -306,12 +298,8 @@ const Header = () => {
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.3 }}
             className="md:hidden bg-white border-t"
-            suppressHydrationWarning
           >
-            <nav
-              className="container mx-auto px-4 py-3 flex flex-col space-y-4"
-              suppressHydrationWarning
-            >
+            <nav className="container mx-auto px-4 py-3 flex flex-col space-y-4">
               {navLinks.map((link) => (
                 <Link
                   key={link.path}
@@ -323,7 +311,7 @@ const Header = () => {
                   }`}
                   onClick={() => setIsMenuOpen(false)}
                 >
-                  <div className="flex items-center" suppressHydrationWarning>
+                  <div className="flex items-center">
                     {link.path === "/" && <FaCalendar className="mr-2" />}
                     {link.path === "/events" && <FaCalendar className="mr-2" />}
                     {link.path === "/recommendations" && (
@@ -343,7 +331,13 @@ const Header = () => {
                       </motion.div>
                     )}
                     {link.path === "/search" && <FaSearch className="mr-2" />}
-                    {link.label}
+                    {link.path === "/recommendations" ? (
+                      <span className="animate-color-shift font-semibold">
+                        {link.label}
+                      </span>
+                    ) : (
+                      link.label
+                    )}
                   </div>
                 </Link>
               ))}
@@ -355,7 +349,7 @@ const Header = () => {
                     className="px-4 py-2 rounded-md transition-colors text-gray-700 hover:bg-gray-50"
                     onClick={() => setIsMenuOpen(false)}
                   >
-                    <div className="flex items-center" suppressHydrationWarning>
+                    <div className="flex items-center">
                       <div className="mr-2 flex-shrink-0">
                         <Image
                           src={user.avatar}
@@ -373,7 +367,7 @@ const Header = () => {
                     className="px-4 py-2 rounded-md transition-colors text-gray-700 hover:bg-gray-50"
                     onClick={() => setIsMenuOpen(false)}
                   >
-                    <div className="flex items-center" suppressHydrationWarning>
+                    <div className="flex items-center">
                       <FaPlus className="mr-2" />
                       Create Event
                     </div>
@@ -383,7 +377,7 @@ const Header = () => {
                     className="px-4 py-2 rounded-md transition-colors text-gray-700 hover:bg-gray-50"
                     onClick={() => setIsMenuOpen(false)}
                   >
-                    <div className="flex items-center" suppressHydrationWarning>
+                    <div className="flex items-center">
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
                         className="h-4 w-4 mr-2"
@@ -414,7 +408,7 @@ const Header = () => {
                     }}
                     className="px-4 py-2 rounded-md transition-colors text-gray-700 hover:bg-gray-50 w-full text-left"
                   >
-                    <div className="flex items-center" suppressHydrationWarning>
+                    <div className="flex items-center">
                       <FaSignOutAlt className="mr-2" />
                       Sign out
                     </div>

@@ -583,7 +583,7 @@ export default function ProfilePage() {
                               {location.city}
                               {location.isCurrent && (
                                 <span className="ml-1 text-xs bg-primary-800 text-white px-1.5 py-0.5 rounded-full">
-                                  Current
+                                  Default
                                 </span>
                               )}
                             </span>
@@ -607,7 +607,7 @@ export default function ProfilePage() {
 
               <div className="mt-6 bg-gray-50 p-4 rounded-lg" id="saved">
                 <h2 className="text-lg font-semibold text-gray-900 mb-2">
-                  Your Activity
+                  Your Favorites
                 </h2>
                 <div className="space-y-2 text-gray-700">
                   {savedEvents.length > 0 ? (

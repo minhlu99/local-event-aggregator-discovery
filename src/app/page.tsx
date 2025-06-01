@@ -4,9 +4,10 @@ import EventCard from "@/components/events/EventCard";
 import Header from "@/components/layout/Header";
 import { Event } from "@/types";
 import * as Motion from "framer-motion";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "react-hot-toast";
 import {
   FaCalendar,
@@ -25,11 +26,146 @@ export default function Home() {
   const [isLoadingNearby, setIsLoadingNearby] = useState(true);
   const [savedEvents, setSavedEvents] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [fetchError, setFetchError] = useState(false);
+  const [fetchNearbyError, setFetchNearbyError] = useState(false);
 
   // Location related state
   const [location, setLocation] = useState("");
   const [savedLocations, setSavedLocations] = useState<string[]>([]);
   const [showLocationDropdown, setShowLocationDropdown] = useState(false);
+
+  // Dropdown related state
+  const [dropdownPosition, setDropdownPosition] = useState({
+    top: 0,
+    left: 0,
+    width: 0,
+  });
+  const locationButtonRef = useRef<HTMLDivElement>(null);
+
+  // Search results related state
+  const [searchResults, setSearchResults] = useState<Event[]>([]);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const searchResultsRef = useRef<HTMLDivElement>(null);
+
+  // Debounce related state
+  const [debouncedLocation, setDebouncedLocation] = useState("");
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Function to fetch featured events with retry logic
+  const fetchFeaturedEvents = useCallback(async (retryCount = 0) => {
+    try {
+      setIsLoading(true);
+      setFetchError(false);
+      // Always fetch featured events without the location parameter
+      const response = await fetch(
+        `/api/events?date=upcoming&sort=relevance,desc&size=6&includeTBA=no`
+      );
+
+      if (!response.ok) {
+        throw new Error(`API responded with status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.events && Array.isArray(data.events)) {
+        setFeaturedEvents(data.events);
+      } else {
+        // If no events are returned or the format is unexpected
+        console.warn("No events found or unexpected data format", data);
+        setFeaturedEvents([]);
+      }
+      setIsLoading(false);
+    } catch (error) {
+      console.error("Error fetching featured events:", error);
+
+      // Implement retry logic - retry up to 3 times with exponential backoff
+      if (retryCount < 3) {
+        const delay = Math.pow(2, retryCount) * 1000; // Exponential backoff: 1s, 2s, 4s
+        console.log(`Retrying in ${delay}ms... (Attempt ${retryCount + 1}/3)`);
+
+        setTimeout(() => {
+          fetchFeaturedEvents(retryCount + 1);
+        }, delay);
+      } else {
+        // All retries failed
+        setFeaturedEvents([]);
+        setIsLoading(false);
+        setFetchError(true);
+      }
+    }
+  }, []);
+
+  // Function to fetch nearby events with retry logic
+  const fetchNearbyEvents = useCallback(async (retryCount = 0) => {
+    // Retrieve current location from localStorage instead of using state
+    const currentLocation = localStorage.getItem("currentLocation");
+
+    console.log("Fetching nearby events for location:", currentLocation);
+
+    // Only fetch nearby events if a location is set
+    if (!currentLocation) {
+      console.log("No location set, skipping nearby events fetch");
+      setNearbyEvents([]);
+      setIsLoadingNearby(false);
+      return;
+    }
+
+    try {
+      setIsLoadingNearby(true);
+      setFetchNearbyError(false);
+
+      const apiUrl = `/api/events?date=upcoming&sort=distance,asc&size=6&city=${encodeURIComponent(
+        currentLocation
+      )}`;
+
+      console.log("Fetching from API:", apiUrl);
+
+      const response = await fetch(apiUrl);
+
+      if (!response.ok) {
+        throw new Error(`API responded with status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log(
+        "Nearby events data received:",
+        data.events?.length || 0,
+        "events"
+      );
+
+      if (data.events && Array.isArray(data.events)) {
+        setNearbyEvents(data.events);
+      } else {
+        console.warn("No nearby events found or unexpected data format", data);
+        setNearbyEvents([]);
+      }
+      setIsLoadingNearby(false);
+    } catch (error) {
+      console.error("Error fetching nearby events:", error);
+
+      // Implement retry logic - retry up to 3 times with exponential backoff
+      if (retryCount < 3) {
+        const delay = Math.pow(2, retryCount) * 1000; // Exponential backoff: 1s, 2s, 4s
+        console.log(
+          `Retrying nearby events in ${delay}ms... (Attempt ${
+            retryCount + 1
+          }/3)`
+        );
+
+        setTimeout(() => {
+          fetchNearbyEvents(retryCount + 1);
+        }, delay);
+      } else {
+        // All retries failed
+        setNearbyEvents([]);
+        setIsLoadingNearby(false);
+        setFetchNearbyError(true);
+      }
+    }
+  }, []);
 
   // Load user preferences and saved events on mount
   useEffect(() => {
@@ -69,10 +205,28 @@ export default function Home() {
           setSavedEvents(parsedSavedEvents);
         }
       }
+
+      // Initial data fetch
+      fetchFeaturedEvents();
     } catch (error) {
       console.error("Error loading user preferences:", error);
     }
-  }, []);
+  }, [fetchFeaturedEvents]);
+
+  // Fetch nearby events once when component mounts and location is available
+  useEffect(() => {
+    const storedLocation = localStorage.getItem("currentLocation");
+    if (storedLocation && storedLocation !== "Detecting location...") {
+      fetchNearbyEvents();
+    }
+  }, [fetchNearbyEvents]);
+
+  // Also fetch nearby events when debounced location changes
+  useEffect(() => {
+    if (debouncedLocation && debouncedLocation !== "Detecting location...") {
+      fetchNearbyEvents();
+    }
+  }, [debouncedLocation, fetchNearbyEvents]);
 
   // Function to toggle saved/favorited events
   const handleSaveToggle = (eventId: string) => {
@@ -99,106 +253,161 @@ export default function Home() {
     setSavedEvents(updatedSaved);
   };
 
-  // Fetch featured events
-  useEffect(() => {
-    const fetchFeaturedEvents = async () => {
-      try {
-        setIsLoading(true);
-        // Match events page parameters but limit to 6 results
-        // Include location if available
-        const locationParam = location
-          ? `&city=${encodeURIComponent(location)}`
-          : "";
-
-        const response = await fetch(
-          `/api/events?date=upcoming&sort=relevance,desc&size=6&includeTBA=no${locationParam}`
-        );
-
-        if (!response.ok) {
-          throw new Error(`API responded with status: ${response.status}`);
-        }
-
-        const data = await response.json();
-
-        if (data.events && Array.isArray(data.events)) {
-          setFeaturedEvents(data.events);
-        } else {
-          // If no events are returned or the format is unexpected
-          console.warn("No events found or unexpected data format", data);
-          setFeaturedEvents([]);
-        }
-        setIsLoading(false);
-      } catch (error) {
-        console.error("Error fetching featured events:", error);
-        setFeaturedEvents([]);
-        setIsLoading(false);
-      }
-    };
-
-    const fetchNearbyEvents = async () => {
-      // Only fetch nearby events if a location is set
-      if (!location) {
-        setNearbyEvents([]);
-        setIsLoadingNearby(false);
-        return;
-      }
-
-      try {
-        setIsLoadingNearby(true);
-        const response = await fetch(
-          `/api/events?date=upcoming&sort=distance,asc&size=6&city=${encodeURIComponent(
-            location
-          )}`
-        );
-
-        if (!response.ok) {
-          throw new Error(`API responded with status: ${response.status}`);
-        }
-
-        const data = await response.json();
-
-        if (data.events && Array.isArray(data.events)) {
-          setNearbyEvents(data.events);
-        } else {
-          console.warn(
-            "No nearby events found or unexpected data format",
-            data
-          );
-          setNearbyEvents([]);
-        }
-        setIsLoadingNearby(false);
-      } catch (error) {
-        console.error("Error fetching nearby events:", error);
-        setNearbyEvents([]);
-        setIsLoadingNearby(false);
-      }
-    };
-
-    fetchFeaturedEvents();
-    fetchNearbyEvents();
-  }, [location]);
-
-  // Handle search input change
+  // Function to handle search input with debounce
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setSearchTerm(value);
+
+    // Clear any existing debounce timer
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
+    }
+
+    if (value.trim().length > 2) {
+      // Show loading state
+      setIsSearching(true);
+
+      // Set a new timer
+      searchDebounceRef.current = setTimeout(() => {
+        fetchSearchResults(value);
+      }, 500); // 500ms debounce delay
+    } else {
+      setSearchResults([]);
+      setShowSearchResults(false);
+      setIsSearching(false);
+    }
   };
 
-  // Handle location change
-  const handleLocationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setLocation(e.target.value);
+  // Function to fetch search results
+  const fetchSearchResults = async (query: string) => {
+    try {
+      const response = await fetch(
+        `/api/events?keyword=${encodeURIComponent(query)}&size=5`
+      );
+
+      if (!response.ok) {
+        throw new Error(`API responded with status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.events && Array.isArray(data.events)) {
+        setSearchResults(data.events);
+        setShowSearchResults(data.events.length > 0);
+      } else {
+        setSearchResults([]);
+        setShowSearchResults(false);
+      }
+    } catch (error) {
+      console.error("Error fetching search results:", error);
+      setSearchResults([]);
+      setShowSearchResults(false);
+    } finally {
+      setIsSearching(false);
+    }
   };
+
+  // Navigate to event detail page
+  const goToEventDetail = (eventId: string) => {
+    setShowSearchResults(false);
+    router.push(`/events/${eventId}`);
+  };
+
+  // Close search results when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        searchResultsRef.current &&
+        !searchResultsRef.current.contains(event.target as Node) &&
+        searchInputRef.current &&
+        !searchInputRef.current.contains(event.target as Node)
+      ) {
+        setShowSearchResults(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  // Clean up the debounce timer when component unmounts
+  useEffect(() => {
+    return () => {
+      if (searchDebounceRef.current) {
+        clearTimeout(searchDebounceRef.current);
+      }
+    };
+  }, []);
+
+  // Function to position the dropdown
+  const updateDropdownPosition = () => {
+    if (locationButtonRef.current) {
+      const rect = locationButtonRef.current.getBoundingClientRect();
+
+      // Calculate ideal dropdown position
+      const idealLeft = rect.left + window.scrollX;
+
+      // Check if dropdown would go off screen (assuming dropdown width is 300px)
+      const dropdownWidth = 300;
+      const windowWidth = window.innerWidth;
+
+      // Adjust left position if needed to keep dropdown on screen
+      const adjustedLeft = Math.min(
+        idealLeft,
+        windowWidth - dropdownWidth - 10
+      ); // 10px margin
+
+      setDropdownPosition({
+        top: rect.bottom + window.scrollY,
+        left: adjustedLeft,
+        width: rect.width,
+      });
+    }
+  };
+
+  // Update dropdown position when toggling
+  const toggleLocationDropdown = () => {
+    if (!showLocationDropdown) {
+      updateDropdownPosition();
+    }
+    setShowLocationDropdown(!showLocationDropdown);
+  };
+
+  // Update dropdown position on resize
+  useEffect(() => {
+    if (showLocationDropdown) {
+      window.addEventListener("resize", updateDropdownPosition);
+      return () => {
+        window.removeEventListener("resize", updateDropdownPosition);
+      };
+    }
+  }, [showLocationDropdown]);
 
   // Select from saved locations
   const selectLocation = (selectedLocation: string) => {
     setLocation(selectedLocation);
+    setDebouncedLocation(selectedLocation); // Update debounced value immediately
     setShowLocationDropdown(false);
 
     // Update current location in localStorage
     localStorage.setItem("currentLocation", selectedLocation);
+
+    // No need to trigger API calls here
   };
 
+  // Clean up the timer when component unmounts
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
+
   // Get current location
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const getCurrentLocation = () => {
     // Check if running in a browser environment
     if (typeof window === "undefined" || !navigator.geolocation) {
@@ -229,6 +438,7 @@ export default function Home() {
 
             if (cityName) {
               setLocation(cityName);
+              setDebouncedLocation(cityName); // Update debounced location immediately
               localStorage.setItem("currentLocation", cityName);
 
               // Add to saved locations if not already there
@@ -250,8 +460,12 @@ export default function Home() {
 
               // Remove the permission denied flag if it was set before
               localStorage.removeItem("locationPermissionDenied");
+
+              // Fetch nearby events after location is updated
+              fetchNearbyEvents();
             } else {
               setLocation("");
+              setDebouncedLocation(""); // Clear debounced location as well
               alert(
                 "Couldn't determine your city. Please enter a location manually."
               );
@@ -259,6 +473,7 @@ export default function Home() {
           } catch (error) {
             console.error("Error getting location data:", error);
             setLocation("");
+            setDebouncedLocation(""); // Clear debounced location as well
             alert(
               "Failed to get your location. Please enter a location manually."
             );
@@ -314,11 +529,6 @@ export default function Home() {
     }
   };
 
-  // Toggle location dropdown
-  const toggleLocationDropdown = () => {
-    setShowLocationDropdown(!showLocationDropdown);
-  };
-
   // Clear search
   const clearSearch = () => {
     setSearchTerm("");
@@ -331,7 +541,11 @@ export default function Home() {
     // Build search query URL
     let searchUrl = `/search?`;
     if (searchTerm) searchUrl += `q=${encodeURIComponent(searchTerm)}`;
-    if (location) searchUrl += `&location=${encodeURIComponent(location)}`;
+    if (location) {
+      // Use the & only if there's already a parameter
+      if (searchTerm) searchUrl += "&";
+      searchUrl += `location=${encodeURIComponent(location)}`;
+    }
 
     router.push(searchUrl);
   };
@@ -376,14 +590,20 @@ export default function Home() {
 
               {/* Search form */}
               <div className="bg-white rounded-lg shadow-xl p-4 md:p-0 md:pl-6 flex flex-col md:flex-row items-stretch max-w-3xl mx-auto">
-                <div className="flex-grow flex items-center mr-4 mb-4 md:mb-0">
+                <div className="flex-grow flex items-center mr-4 mb-4 md:mb-0 relative">
                   <FaSearch className="text-gray-400 mr-3" />
                   <input
+                    ref={searchInputRef}
                     type="text"
-                    placeholder="Search for events, venues, or artists"
+                    placeholder="Search for events"
                     className="w-full outline-none text-gray-800 bg-white"
                     value={searchTerm}
                     onChange={handleSearchChange}
+                    onFocus={() => {
+                      if (searchResults.length > 0) {
+                        setShowSearchResults(true);
+                      }
+                    }}
                   />
                   {searchTerm && (
                     <button
@@ -393,43 +613,121 @@ export default function Home() {
                       <FaTimes />
                     </button>
                   )}
+
+                  {/* Search results dropdown */}
+                  {showSearchResults && (
+                    <div
+                      ref={searchResultsRef}
+                      className="absolute top-full left-0 right-0 mt-1 bg-white shadow-xl rounded-md z-[99999] overflow-hidden"
+                      style={{
+                        position: "fixed",
+                        top: searchInputRef.current
+                          ? searchInputRef.current.getBoundingClientRect()
+                              .bottom +
+                            window.scrollY +
+                            5
+                          : 0,
+                        left: searchInputRef.current
+                          ? searchInputRef.current.getBoundingClientRect()
+                              .left + window.scrollX
+                          : 0,
+                        width: searchInputRef.current
+                          ? searchInputRef.current.getBoundingClientRect().width
+                          : "auto",
+                        maxHeight: "60vh",
+                      }}
+                    >
+                      <ul className="py-1 max-h-60 overflow-y-auto">
+                        {searchResults.map((event) => (
+                          <li
+                            key={event.id}
+                            className="border-b border-gray-100 last:border-0"
+                          >
+                            <button
+                              onClick={() => goToEventDetail(event.id)}
+                              className="w-full text-left px-3 py-2 hover:bg-gray-100 transition-colors"
+                            >
+                              <div className="flex items-start">
+                                {event.images && event.images[0] && (
+                                  <div className="w-12 h-12 rounded overflow-hidden flex-shrink-0 mr-3">
+                                    <Image
+                                      src={event.images[0].url}
+                                      alt={event.name}
+                                      className="w-full h-full object-cover"
+                                      width={48}
+                                      height={48}
+                                    />
+                                  </div>
+                                )}
+                                <div className="flex-grow">
+                                  <div className="font-medium text-gray-900 truncate">
+                                    {event.name}
+                                  </div>
+                                  <div className="text-sm text-gray-500 flex items-center">
+                                    <FaCalendar className="mr-1" size={10} />
+                                    <span>{event.startDate || "Date TBA"}</span>
+                                  </div>
+                                  {event.venue && (
+                                    <div className="text-sm text-gray-500 flex items-center">
+                                      <FaMapMarkerAlt
+                                        className="mr-1"
+                                        size={10}
+                                      />
+                                      <span className="truncate">
+                                        {event.venue.name}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Loading indicator */}
+                  {isSearching && (
+                    <div
+                      className="fixed left-0 right-0 mt-1 bg-white shadow-xl rounded-md z-[10001] py-4 text-center text-gray-500"
+                      style={{
+                        top: searchInputRef.current
+                          ? searchInputRef.current.getBoundingClientRect()
+                              .bottom +
+                            window.scrollY +
+                            5
+                          : 0,
+                        left: searchInputRef.current
+                          ? searchInputRef.current.getBoundingClientRect()
+                              .left + window.scrollX
+                          : 0,
+                        width: searchInputRef.current
+                          ? searchInputRef.current.getBoundingClientRect().width
+                          : "auto",
+                      }}
+                    >
+                      <div className="animate-pulse">Searching...</div>
+                    </div>
+                  )}
                 </div>
 
-                {/* Location dropdown */}
-                <div className="relative md:border-l border-gray-200 px-4 flex items-center mb-4 md:mb-0">
-                  <FaMapMarkerAlt className="text-gray-400 mr-2" />
-                  <div className="relative w-full">
-                    <input
-                      type="text"
-                      placeholder="Location"
-                      className="w-full outline-none text-gray-800 pr-8 bg-white"
-                      value={location}
-                      onChange={handleLocationChange}
-                    />
-                    <div className="absolute right-0 top-1/2 transform -translate-y-1/2 flex">
-                      <button
-                        onClick={getCurrentLocation}
-                        className="text-gray-400 hover:text-primary-600 mr-2"
-                        title="Use current location"
-                        aria-label="Use current location"
+                {/* Location dropdown - only shown when there are saved locations */}
+                {savedLocations.length > 0 ? (
+                  <div className="relative cursor-pointer md:border-l border-gray-200 px-4 flex items-center mb-4 md:mb-0">
+                    <FaMapMarkerAlt className="text-gray-400 mr-2" />
+                    <div className="relative w-full">
+                      <div
+                        ref={locationButtonRef}
+                        className="w-full outline-none text-gray-800 pr-8 bg-white cursor-pointer flex items-center min-h-[24px]"
+                        onClick={toggleLocationDropdown}
                       >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          viewBox="0 0 24 24"
-                          fill="currentColor"
-                          className="w-4 h-4"
-                        >
-                          <path
-                            fillRule="evenodd"
-                            d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25zM8.547 4.505a8.25 8.25 0 1011.672 8.214l-.46-.46a2.252 2.252 0 01-.422-.586l-1.08-2.16a.414.414 0 00-.663-.107.827.827 0 01-.812.21l-1.273-.363a.89.89 0 00-.738 1.595l.587.39c.59.395.674 1.23.172 1.732l-.2.2c-.211.212-.33.498-.33.796v.41c0 .409-.11.809-.32 1.158l-1.315 2.191a2.11 2.11 0 01-1.81 1.025 1.055 1.055 0 01-1.055-1.055v-1.172c0-.92-.56-1.747-1.414-2.089l-.654-.261a2.25 2.25 0 01-1.384-2.46l.007-.042a2.25 2.25 0 01.29-.787l.09-.15a2.25 2.25 0 012.37-1.048l1.178.236a1.125 1.125 0 001.302-.795l.208-.73a1.125 1.125 0 00-.578-1.315l-.665-.332-.091.091a2.25 2.25 0 01-1.591.659h-.18c-.249 0-.487.1-.662.274a.931.931 0 01-1.458-1.137l1.279-2.132z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
-                      </button>
-                      {savedLocations.length > 0 && (
+                        {location || "Select location"}
+                      </div>
+                      <div className="absolute right-0 top-1/2 transform -translate-y-1/2 flex">
                         <button
                           onClick={toggleLocationDropdown}
-                          className="text-gray-400 hover:text-gray-600"
+                          className="text-gray-400 hover:text-gray-600 cursor-pointer"
                           aria-label="Toggle saved locations"
                         >
                           {showLocationDropdown ? (
@@ -438,48 +736,16 @@ export default function Home() {
                             <FaChevronDown />
                           )}
                         </button>
-                      )}
+                      </div>
                     </div>
                   </div>
-
-                  {/* Saved locations dropdown */}
-                  {showLocationDropdown && savedLocations.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-white shadow-lg rounded-md z-20">
-                      <ul className="py-1 max-h-48 overflow-y-auto">
-                        {savedLocations.map((savedLocation, index) => (
-                          <li key={index}>
-                            <button
-                              onClick={() => selectLocation(savedLocation)}
-                              className={`w-full text-left px-3 py-2 hover:bg-gray-100 ${
-                                location === savedLocation
-                                  ? "bg-primary-50 text-primary-700"
-                                  : "text-gray-700"
-                              }`}
-                            >
-                              <FaMapMarkerAlt
-                                className="inline-block mr-2 text-gray-400"
-                                size={12}
-                              />
-                              {savedLocation}
-                              {localStorage.getItem("currentLocation") ===
-                                savedLocation && (
-                                <span className="ml-1 text-xs text-primary-600">
-                                  (current)
-                                </span>
-                              )}
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
+                ) : null}
 
                 <button
                   onClick={handleSearchSubmit}
-                  className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-r-lg transition-colors"
+                  className="bg-primary-600 hover:bg-primary-700 cursor-pointer text-white px-6 py-3 rounded-r-lg transition-colors"
                 >
-                  Search
+                  {savedLocations.length > 0 ? "Search" : "Advanced Search"}
                 </button>
               </div>
             </div>
@@ -497,8 +763,56 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Events Near Me Section - Only shown when location is set */}
-        {location && nearbyEvents.length > 0 && (
+        {/* Floating dropdown for locations - will be at the top level of the DOM */}
+        {showLocationDropdown && savedLocations.length > 0 && (
+          <>
+            <div
+              className="fixed inset-0 bg-transparent z-[9999]"
+              onClick={() => setShowLocationDropdown(false)}
+            />
+            <div
+              className="fixed bg-white shadow-xl rounded-md z-[10000] overflow-hidden"
+              style={{
+                top: `${dropdownPosition.top}px`,
+                left: `${dropdownPosition.left}px`,
+                width: "300px", // Fixed width of 300px
+                maxHeight: "300px",
+              }}
+            >
+              <ul className="py-1 max-h-48 overflow-y-auto">
+                {savedLocations.map((savedLocation, index) => (
+                  <li key={index}>
+                    <button
+                      onClick={() => selectLocation(savedLocation)}
+                      className={`w-full text-left px-3 py-2 hover:bg-gray-100 ${
+                        location === savedLocation
+                          ? "bg-primary-50 text-primary-700"
+                          : "text-gray-700"
+                      }`}
+                    >
+                      <div className="flex items-center whitespace-nowrap overflow-hidden text-ellipsis">
+                        <FaMapMarkerAlt
+                          className="inline-block mr-2 text-gray-400 flex-shrink-0"
+                          size={12}
+                        />
+                        <span className="truncate">{savedLocation}</span>
+                        {localStorage.getItem("currentLocation") ===
+                          savedLocation && (
+                          <span className="ml-1 text-xs text-primary-600 flex-shrink-0">
+                            (default)
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </>
+        )}
+
+        {/* Events Near Me Section - Only shown when location is set and events are available */}
+        {location && (nearbyEvents.length > 0 || isLoadingNearby) && (
           <section className="py-16 bg-gray-50">
             <div className="container mx-auto px-4">
               <div className="flex justify-between items-center mb-8">
@@ -524,7 +838,7 @@ export default function Home() {
                     </div>
                   ))}
                 </div>
-              ) : (
+              ) : nearbyEvents.length > 0 ? (
                 <motion.div
                   className="grid grid-cols-1 md:grid-cols-3 gap-6"
                   variants={containerVariants}
@@ -541,7 +855,23 @@ export default function Home() {
                     </motion.div>
                   ))}
                 </motion.div>
-              )}
+              ) : fetchNearbyError ? (
+                <div className="text-center py-12">
+                  <p className="text-gray-500 mb-4">
+                    Unable to load nearby events. Please try again later.
+                  </p>
+                  <button
+                    onClick={() => {
+                      setIsLoadingNearby(true);
+                      setFetchNearbyError(false);
+                      fetchNearbyEvents();
+                    }}
+                    className="inline-block bg-primary-600 hover:bg-primary-700 text-white py-2 px-6 rounded-md transition-colors"
+                  >
+                    Reload Events
+                  </button>
+                </div>
+              ) : null}
             </div>
           </section>
         )}
@@ -589,6 +919,22 @@ export default function Home() {
                   </motion.div>
                 ))}
               </motion.div>
+            ) : fetchError ? (
+              <div className="text-center py-12">
+                <p className="text-gray-500 mb-4">
+                  Unable to load events. Please try again later.
+                </p>
+                <button
+                  onClick={() => {
+                    setIsLoading(true);
+                    setFetchError(false);
+                    fetchFeaturedEvents();
+                  }}
+                  className="inline-block bg-primary-600 hover:bg-primary-700 text-white py-2 px-6 rounded-md transition-colors"
+                >
+                  Reload Events
+                </button>
+              </div>
             ) : (
               <div className="text-center py-12">
                 <p className="text-gray-500 mb-4">No upcoming events found</p>
